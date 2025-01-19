@@ -11,12 +11,15 @@ import {
   TouchableOpacity,
   Image,
   DatePickerIOS,
+  FlatList,
+  Button,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
 import Swiper from 'react-native-swiper';
 import { launchImageLibrary } from 'react-native-image-picker';
 import DateTimePickerModal from 'react-native-modal-datetime-picker';
 import DateTimePicker from '@react-native-community/datetimepicker';
+import DeleteIcon from 'react-native-vector-icons/AntDesign';
 
 import TimeSlotPicker from './TimeSlotPicker ';
 import DayTimeList from './DayTimeList';
@@ -27,6 +30,8 @@ import { useNavigation, useRoute } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
 import mime from 'mime';
+import CategoryDropdown from './TourSelection ';
+import SelectCity from './CitySelection';
 
 const { width, height } = Dimensions.get('window');
 
@@ -36,61 +41,86 @@ export default function Tour() {
   const navigation = useNavigation();
   const { tourId, tourName } = route.params;
   const [selectedTourId, setSelectedTourId] = useState(null);
+  const [selectedCityId, setSelectedCityId] = useState(null);
 
   const [media, setMedia] = useState([]);
   const [languages, setLanguages] = useState('');
   const [price, setPrice] = useState('');
   const [description, setDescription] = useState('');
+  const [duration, setDuration] = useState('');
   const [leaderName, setLeaderName] = useState('');
   const [leaderImage, setLeaderImage] = useState(null);
   const [leaderDescription, setLeaderDescription] = useState('');
   const [daysData, setDaysData] = useState([]);
   const [timeRanges, setTimeRanges] = useState([]);
   const [title, setTitle] = useState('');
+  const [meetingPoint, setMeetingPoint] = useState('');
+  const [tourIncludes, setTourIncludes] = useState([]);
+  const [tourExcludes, setTourExcludes] = useState([]);
+  const [includeText, setIncludeText] = useState('');
+  const [excludeText, setExcludeText] = useState('');
+  const [days, setDays] = useState([]);
+  const [dayText, setDayText] = useState('');
+  const [timeText, setTimeText] = useState('');
+  const [activeDayId, setActiveDayId] = useState(null);
 
-
-  const handleAddDay = () => {
-    setDaysData([...daysData, { day: '', timeRanges: [{ startTime: '', endTime: '' }] }]);
+  const addInclude = () => {
+    if (includeText.trim() !== '') {
+      setTourIncludes([...tourIncludes, includeText.trim()]);
+      setIncludeText('');
+    }
   };
 
 
 
-
-  const handleDayChange = (index, text) => {
-    const updatedDaysData = [...daysData];
-    updatedDaysData[index].day = text;
-    setDaysData(updatedDaysData);
-  };
-
-  const handleTimeRangeChange = (dayIndex, timeIndex, field, value) => {
-    const updatedDaysData = [...daysData];
-    updatedDaysData[dayIndex].timeRanges[timeIndex][field] = value;
-    setDaysData(updatedDaysData);
+  const addExclude = () => {
+    if (excludeText.trim() !== '') {
+      setTourExcludes([...tourExcludes, excludeText.trim()]);
+      setExcludeText('');
+    }
   };
 
 
-  const handleAddTimeSlot = (index) => {
-    const newDaysData = [...daysData];
-    newDaysData[index].timeRanges.push({ startTime: '', endTime: '' });
-    setDaysData(newDaysData);
+  const addDay = () => {
+    if (dayText.trim() !== '') {
+      setDays([
+        ...days,
+        { id: Date.now().toString(), day: dayText, times: [] },
+      ]);
+      setDayText('');
+      setActiveDayId(null);
+    }
   };
 
 
-  const handleRemoveTimeSlot = (dayIndex, timeIndex) => {
-    const updatedDaysData = [...daysData];
-    updatedDaysData[dayIndex].timeRanges.splice(timeIndex, 1);
-    setDaysData(updatedDaysData);
+  const addTime = () => {
+    if (timeText.trim() !== '' && activeDayId) {
+      setDays(
+        days.map((day) =>
+          day.id === activeDayId
+            ? { ...day, times: [...day.times, timeText.trim()] }
+            : day
+        )
+      );
+      setTimeText('');
+    }
   };
 
-  const handleRemoveDay = (index) => {
-    const newDaysData = [...daysData];
-    newDaysData.splice(index, 1);
-    setDaysData(newDaysData);
+  const deleteTime = (dayId, timeIndex) => {
+    setDays(
+      days.map((day) =>
+        day.id === dayId
+          ? { ...day, times: day.times.filter((_, index) => index !== timeIndex) }
+          : day
+      )
+    );
   };
 
-  const updateDaysData = (updatedData) => {
-    setDaysData(updatedData);
+
+  const deleteDay = (dayId) => {
+    setDays(days.filter((day) => day.id !== dayId));
   };
+
 
   const normalizeUri = (uri) => {
     return Platform.OS === 'android' ? `file:///${uri.replace('file:/', '')}` : uri;
@@ -321,6 +351,32 @@ export default function Tour() {
     });
   };
 
+  const editMedia = async (index) => {
+    const options = {
+      mediaType: 'mixed',
+      selectionLimit: 1,
+    };
+
+    launchImageLibrary(options, (response) => {
+      if (!response.didCancel && !response.errorCode) {
+        const selected = response.assets?.[0];
+
+        if (selected) {
+          if (
+            (selected.type?.includes('image') && selected.fileSize <= 10000000) ||
+            (selected.type?.includes('video') && selected.fileSize <= 50000000)
+          ) {
+            const updatedMedia = [...media];
+            updatedMedia[index] = selected; // Replace media at the specific index
+            setMedia(updatedMedia);
+          } else {
+            Alert.alert('Error', 'Selected media exceeds allowed size limits.');
+          }
+        }
+      }
+    });
+  };
+
 
 
 
@@ -350,7 +406,7 @@ export default function Tour() {
 
 
 
-        <TextInput style={styles.mainTitle} placeholder='Enter tour title' placeholderTextColor="#66" value={title} onChangeText={setTitle} />
+        <TextInput style={styles.mainTitle} placeholder='Enter tour title' placeholderTextColor="#666" value={title} onChangeText={setTitle} />
 
 
         <View style={styles.mediaContainer}>
@@ -385,37 +441,38 @@ export default function Tour() {
                     ) : (
                       <Image source={{ uri: item.uri }} style={styles.image} />
                     )}
+                    <TouchableOpacity
+                      style={styles.editButton}
+                      onPress={() => editMedia(index)}
+                    >
+                      <Text style={styles.editButtonText}>Edit</Text>
+                    </TouchableOpacity>
                   </View>
                 ))}
               </Swiper>
 
-
               {media.length < 4 && (
-                <TouchableOpacity
-                  style={styles.addButton}
-                  onPress={pickMedia}
-                >
+                <TouchableOpacity style={styles.addButton} onPress={pickMedia}>
                   <Text style={styles.addButtonText}>+</Text>
                 </TouchableOpacity>
-
-
               )}
             </View>
-
           )}
         </View>
+
 
         <View style={styles.inputRow}>
           <TextInput
             style={styles.halfInput}
-            placeholder="Enter Language/s"
+            placeholder="Enter Language/s in which tour/walk is offered"
             placeholderTextColor="#666"
             value={languages}
             onChangeText={setLanguages}
           />
           <TextInput
             style={styles.halfInput}
-            placeholder="Enter Price"
+            multiline
+            placeholder="Enter Price of Tour/Walk per person in INR"
             placeholderTextColor="#666"
             value={price.toString()}
             keyboardType="numeric"
@@ -424,23 +481,104 @@ export default function Tour() {
 
         </View>
 
-        <TextInput
-          style={styles.textInput}
-          placeholder="Description (Up to 200 words)"
-          placeholderTextColor="#666"
-          multiline
-          value={description}
-          onChangeText={setDescription}
-        />
-
-        <View style={styles.leaderContainer}>
+        <View>
+          <Text style={styles.titleHeader}>
+            Discription
+          </Text>
           <TextInput
             style={styles.textInput}
-            placeholder="Tour Leader Name"
+            placeholder="Description (Up to 200 words)"
             placeholderTextColor="#666"
-            value={leaderName}
-            onChangeText={setLeaderName}
+            multiline
+            value={description}
+            onChangeText={setDescription}
           />
+        </View>
+
+
+
+        <View style={styles.meetingPoint}>
+          <Text style={styles.titleHeader}>Meeting Point : </Text>
+          <TextInput style={styles.underInput} placeholder='Meeting Point' placeholderTextColor="#666" value={meetingPoint} onChangeText={setMeetingPoint} />
+        </View>
+
+        <View style={styles.duration}>
+          <Text style={styles.titleHeader}>Duration of Tour/Walk:</Text>
+          <TextInput
+            style={styles.underInput}
+            placeholder="Duration of Tour/Walk"
+            placeholderTextColor="#666"
+            value={duration}
+            onChangeText={setDuration}
+          />
+        </View>
+
+
+        <View style={styles.rowContainer}>
+
+          <View style={styles.section}>
+            <Text style={styles.title}>Includes</Text>
+            <FlatList
+              data={tourIncludes}
+              keyExtractor={(item, index) => index.toString()}
+              renderItem={({ item }) => (
+                <Text style={styles.bulletPoint}>• {item}</Text>
+              )}
+            />
+            <View style={styles.inputRow}>
+              <TextInput
+                style={styles.input}
+                placeholder="Enter an include"
+                placeholderTextColor="#666"
+                value={includeText}
+                onChangeText={setIncludeText}
+              />
+              <TouchableOpacity style={styles.addButton} onPress={addInclude}>
+                <Text style={styles.addButtonText}>+</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+
+
+          <View style={styles.section}>
+            <Text style={styles.title}>Excludes</Text>
+            <FlatList
+              data={tourExcludes}
+              keyExtractor={(item, index) => index.toString()}
+              renderItem={({ item }) => (
+                <Text style={styles.bulletPoint}>• {item}</Text>
+              )}
+            />
+            <View style={styles.inputRow}>
+              <TextInput
+                style={styles.input}
+                placeholderTextColor="#666"
+                placeholder="Enter an exclude"
+                value={excludeText}
+                onChangeText={setExcludeText}
+              />
+              <TouchableOpacity style={styles.addButton} onPress={addExclude}>
+                <Text style={styles.addButtonText}>+</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+
+
+
+        <View style={styles.leaderContainer}>
+
+          <View style={styles.leaderDetails}>
+            <Text style={styles.title}>Tour leader:</Text>
+            <TextInput
+              style={styles.textInput}
+              placeholder="Tour Leader Name"
+              placeholderTextColor="#666"
+              value={leaderName}
+              onChangeText={setLeaderName}
+            />
+          </View>
+
           <TouchableOpacity onPress={pickLeaderImage}>
             {leaderImage && leaderImage.uri ? (
               <Image
@@ -466,95 +604,111 @@ export default function Tour() {
 
 
         <Text style={styles.slotHeader}>Available Days and Time Slots</Text>
-        {daysData.map((dayData, dayIndex) => (
-          <View key={dayIndex} style={styles.dayContainer}>
-            {/* Input for day */}
-            <TextInput
-              style={styles.dayInput}
-              placeholder="Day"
-              value={dayData.day}
-              onChangeText={(text) => handleDayChange(dayIndex, text)} // Update day value
-            />
 
-            {/* Add Time Range Button */}
-            <TouchableOpacity onPress={() => handleAddTimeSlot(dayIndex)} style={[styles.addSlotButton, styles.floatingButton]}>
-              <Text style={styles.addSlotButtonText} >+</Text>
-            </TouchableOpacity>
 
-            {/* Render Time Range Inputs */}
-            {dayData.timeRanges.map((timeRange, timeIndex) => (
-              <View key={timeIndex} style={styles.timeSlotContainer}>
-                <TextInput
-                  style={styles.timeInput}
-                  placeholder="Start Time"
-                  value={timeRange.startTime}
-                  onChangeText={(text) => handleTimeRangeChange(dayIndex, timeIndex, 'startTime', text)}
-                />
-                <TextInput
-                  style={styles.timeInput}
-                  placeholder="End Time"
-                  value={timeRange.endTime}
-                  onChangeText={(text) => handleTimeRangeChange(dayIndex, timeIndex, 'endTime', text)}
-                />
-                <TouchableOpacity
-                  style={[styles.slotRemoveButton, styles.floatingButton]}
-                  onPress={() => handleRemoveTimeSlot(dayIndex, timeIndex)}
-                >
-                  <Text style={styles.slotRemoveButtonText}>-</Text>
-                </TouchableOpacity>
+        <FlatList
+          data={days}
+          keyExtractor={(item) => item.id}
+          renderItem={({ item }) => (
+            <View style={styles.dayContainer}>
+             
+              <View style={styles.dayTimeContainer}>
+                <View style={styles.dayRow}>
+                  <Text style={styles.dayName}>{item.day}</Text>
+                  <TouchableOpacity onPress={() => deleteDay(item.id)}>
+                    <DeleteIcon name="delete" size={28} style={styles.icon} />
+                  </TouchableOpacity>
+                </View>
+
+
+                
+                <View style={styles.timesRow}>
+                  {item.times.map((time, index) => (
+                    <View key={index} style={styles.timeChip}>
+                      <Text style={styles.timeText}>{time}</Text>
+                      <TouchableOpacity
+                        style={styles.deleteButtonTiny}
+                        onPress={() => deleteTime(item.id, index)}
+                      >
+                        <Text style={styles.deleteButtonText}>-</Text>
+                      </TouchableOpacity>
+                    </View>
+                  ))}
+                </View>
               </View>
-            ))}
 
-            {/* Remove Day Button */}
-            <TouchableOpacity style={styles.removeDayButton} onPress={() => handleRemoveDay(dayIndex)}>
-              <Text style={styles.removeDayButtonText}>Remove Day</Text>
-            </TouchableOpacity>
-          </View>
-        ))}
-
-        {/* Button to add a new Day */}
-
-
-
-
-
-        <TouchableOpacity style={styles.addDayButton} onPress={handleAddDay}>
-          <Text style={styles.addDayButtonText}>Add Day</Text>
-        </TouchableOpacity>
-
-
-
-        <TouchableOpacity style={styles.button} onPress={handleAddDay}>
-          <Text style={styles.buttonText}>+</Text>
-        </TouchableOpacity>
+              
+              {activeDayId === item.id && (
+                <View style={styles.timeInputContainer}>
+                  <TextInput
+                    style={styles.timeInput}
+                    placeholder="Enter time (e.g., 7 PM)"
+                    value={timeText}
+                    placeholderTextColor="#666"
+                    onChangeText={setTimeText}
+                  />
+                  <TouchableOpacity
+                    style={styles.addButtonSmall}
+                    onPress={() => addTime(item.id)}
+                  >
+                    <Text style={styles.addButtonText}>+</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
 
 
+              {activeDayId !== item.id && (
+                <TouchableOpacity
+                  style={styles.addButtonSmall}
+                  onPress={() => setActiveDayId(item.id)}
+                >
+                  <Text style={styles.addButtonText}>+</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          )}
+          ListFooterComponent={
+            <View style={styles.footer}>
 
-        <TourSelection onSelect={(id) => setSelectedTourId(id)} />
-
-        <TextInput
-          style={styles.textInput}
-          placeholder="Enter Guide Name"
-          placeholderTextColor="#666"
-          value={contactInfo.name}
-          onChangeText={(text) => setContactInfo({ ...contactInfo, name: text })}
+              <TextInput
+                style={styles.input}
+                placeholder="Add a day (e.g., Monday)"
+                value={dayText}
+                placeholderTextColor="#666"
+                onChangeText={setDayText}
+              />
+              <TouchableOpacity style={styles.addButton} onPress={addDay}>
+                <Text style={styles.addButtonText}>+</Text>
+              </TouchableOpacity>
+            </View>
+          }
         />
+        <View style={styles.screen}>
+          <CategoryDropdown onSelect={(id) => setSelectedTourId(id)} />
+          <SelectCity onSelect={(id) => setSelectedCityId(id)} />
+        </View >
+      
 
-        <TextInput
-          style={styles.textInput}
-          placeholder="Enter Guide Email"
-          placeholderTextColor="#666"
-          value={contactInfo.email}
-          onChangeText={(text) => setContactInfo({ ...contactInfo, email: text })}
-        />
-
-        <TextInput
-          style={styles.textInput}
-          placeholder="Enter Guide Phone"
-          placeholderTextColor="#666"
-          value={contactInfo.phone}
-          onChangeText={(text) => setContactInfo({ ...contactInfo, phone: text })}
-        />
+        <View style={styles.meetingPoint}>
+          <Text style={styles.titleHeader}>Enter Contact Number : </Text>
+          <TextInput
+            style={styles.underInput}
+            placeholder="Enter Guide Phone number"
+            placeholderTextColor="#666"
+            value={contactInfo.phone}
+            onChangeText={(text) => setContactInfo({ ...contactInfo, phone: text })}
+          />
+        </View>
+        <View style={styles.meetingPoint}>
+          <Text style={styles.titleHeader}>Enter Email Id : </Text>
+          <TextInput
+            style={styles.underInput}
+            placeholder="Enter Email Id"
+            placeholderTextColor="#666"
+            value={contactInfo.email}
+            onChangeText={(text) => setContactInfo({ ...contactInfo, email: text })}
+          />
+        </View>
 
 
 
@@ -587,12 +741,14 @@ const styles = StyleSheet.create({
     marginBottom: height * 0.02,
   },
   mediaContainer: {
-    marginBottom: height * 0.02,
+    height: "20%",
+    marginBottom: height * 0.05,
     alignItems: 'center',
+
   },
   placeholder: {
-    width: 335,
-    height: 235,
+    width: "100%",
+    height: "100%",
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: '#f0f0f0',
@@ -603,14 +759,14 @@ const styles = StyleSheet.create({
     color: '#666',
   },
   swiper: {
-    width: 335,
-    height: 235,
+    width: "100%",
+    height: "100%",
   },
   slide: {
     justifyContent: 'center',
     alignItems: 'center',
     width: '100%',
-    height: 235,
+    height: "100%",
     backgroundColor: '#f0f0f0',
     borderRadius: 10,
   },
@@ -635,13 +791,20 @@ const styles = StyleSheet.create({
   inputRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: height * 0.02,
+    marginBottom: height * 0.01,
   },
   halfInput: {
     flex: 0.48,
     borderBottomWidth: 1,
     borderColor: '#ccc',
     paddingVertical: 5,
+  },
+  underInput: {
+    flex: width,
+    borderBottomWidth: 1,
+    borderColor: '#ccc',
+    paddingVertical: 5,
+    marginBottom: 10
   },
   mainTitle: {
     flex: 0.48,
@@ -651,10 +814,12 @@ const styles = StyleSheet.create({
     marginBottom: 15
   },
   textInput: {
+    flex: 1,
     borderBottomWidth: 1,
     borderColor: '#ccc',
-    paddingVertical: 5,
-    marginBottom: height * 0.02,
+    padding: 8,
+    borderRadius: 4,
+    fontSize: 14,
   },
   leaderContainer: {
     alignItems: 'center',
@@ -667,7 +832,7 @@ const styles = StyleSheet.create({
     marginBottom: height * 0.01,
   },
   slotHeader: {
-    fontSize: width * 0.05,
+    fontSize: width * 0.02,
     fontWeight: '600',
     marginBottom: height * 0.01,
   },
@@ -696,6 +861,7 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     alignItems: 'center',
     borderRadius: 10,
+    marginTop: 20,
     marginBottom: 15
   },
   submitButtonText: {
@@ -715,7 +881,7 @@ const styles = StyleSheet.create({
     height: 235,
   },
   dot: {
-    backgroundColor: '#ccc',
+    backgroundColor: 'rgba(222, 59, 64, 0.7)',
     width: 8,
     height: 8,
     borderRadius: 4,
@@ -757,17 +923,47 @@ const styles = StyleSheet.create({
     height: '100%',
   },
   slotHeader: {
-    fontSize: 18,
-    fontWeight: 'bold',
+    fontSize: 16,
+    fontWeight: '600',
     marginBottom: 10,
   },
+  titleHeader: {
+    fontSize: 16,
+    fontWeight: '500',
+    marginBottom: 10,
+  },
+  meetingPoint: {
+    marginTop: 10,
+    display: 'flex',
+    flexDirection: 'row',
+    alignContent: 'center',
+    alignItems: 'center',
+    justifyContent: 'flex-start',
+  },
+  duration: {
+    marginTop: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginVertical: 10,
+    gap: 10
+  },
   dayContainer: {
-    marginBottom: 20, // Space between days
-    padding: 10,      // Padding inside the day block
-    backgroundColor: '#f9f9f9', // Light background color
-    borderRadius: 8,  // Rounded corners
-    borderWidth: 1,   // Border around the day block
-    borderColor: '#ccc', // Border color
+    padding: 12,
+    marginBottom: 16,
+    backgroundColor: '#fff',
+    borderRadius: 8,
+    shadowColor: '#000',
+    shadowOpacity: 0.1,
+    shadowOffset: { width: 0, height: 2 },
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  dayRow: {
+    flexDirection: 'row',        // Arrange children in a row
+    alignItems: 'center',        // Vertically align items
+    justifyContent: 'space-between', // Push elements to opposite ends
+    marginBottom: 8,             // Add some spacing below the row
   },
   dayInputContainer: {
     flexDirection: 'row',
@@ -795,77 +991,158 @@ const styles = StyleSheet.create({
     marginRight: 10,     // Space between the two time input fields
     paddingHorizontal: 10, // Padding inside the input field
   },
-  addSlotButton: {
-    backgroundColor: '#ff4d4d',
-    paddingVertical: 5,
-    paddingHorizontal: 15,
+
+  mainTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    marginBottom: 16,
+    textAlign: 'center',
+  },
+  rowContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  section: {
+    flex: 1,
+    marginHorizontal: 8,
+  },
+  leaderDetails: {
+    flexDirection: 'row', // Aligns "Tour Leader" and input in a row
+    alignItems: 'center', // Centers vertically
+    width: '100%', // Ensures the row takes full width
+    marginBottom: 10, // Adds spacing below this row
+  },
+  title: {
+    fontSize: 16,
+    fontWeight: '500',
+    marginBottom: 8,
+  },
+  bulletPoint: {
+    fontSize: 16,
+    marginVertical: 4,
+  },
+  input: {
+
+    borderColor: '#ccc',
+    padding: 8,
+    marginBottom: 25,
+    borderRadius: 4,
+  },
+  addButton: {
+    backgroundColor: '#FF5E5E',
+    width: 40,
+    height: 40,
     borderRadius: 20,
     alignItems: 'center',
-    alignSelf: 'flex-start',
-    marginTop: 5,
-    marginBottom: 5
-  },
-  addSlotButtonText: {
-    color: '#fff',
-    fontSize: 18,
-    fontWeight: 'bold',
-  },
-  slotRemoveButton: {
-    backgroundColor: '#ff4d4d', // Red background for remove button
-    justifyContent: 'center', // Center the text
-    alignItems: 'center',     // Center the text
-    width: 30,                // Width of the button
-    height: 30,               // Height of the button
-    borderRadius: 15,         // Round the button
-  },
-  slotRemoveButtonText: {
-    color: '#fff',           // White text color
-    fontWeight: 'bold',      // Bold text
-    fontSize: 18,            // Font size
-  },
-  removeButton: {
-    backgroundColor: '#DC3545',
-    paddingVertical: 5,
-    paddingHorizontal: 15,
-    borderRadius: 20,
     justifyContent: 'center',
-    alignItems: 'center',
   },
-  removeButtonText: {
+  addButtonText: {
     color: '#fff',
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: 'bold',
   },
-  addDayButton: {
-    backgroundColor: '#4CAF50', // Green background for "Add Day" button
-    padding: 10,                // Padding inside the button
-    borderRadius: 5,           // Rounded corners
-    marginTop: 20,             // Space above the button
-    alignItems: 'center',      // Center the text
+  addButtonSmall: {
+    backgroundColor: '#FF5E5E',
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  addDayButtonText: {
-    color: '#fff',            // White text color
-    fontSize: 16,             // Font size
-    fontWeight: 'bold',       // Bold text
+
+  dayName: {
+    fontSize: 16,                // Text size for the day name
+    fontWeight: 'bold',          // Make the day name bold
+    color: '#333',               // Day name text color
   },
-  buttonText: {
+  timeInput: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: '#ccc',
+    padding: 8,
+    borderRadius: 4,
+    fontSize: 14,
+    marginRight: 8,
+  },
+  timesRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginLeft: 8,
+    flex: 1,
+  },
+
+  dayTimeContainer: {
+    display: "flex",
+    flexDirection: "row"
+  },
+
+
+  timeInputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 8,
+  },
+  timeChip: {
+    backgroundColor: '#e0e0e0',
+    borderRadius: 16,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    marginRight: 8,
+    marginBottom: 8,
+  },
+  timeText: {
+    fontSize: 14,
+    color: '#333',
+  },
+  deleteButtonSmall: {
+    backgroundColor: '#FF5E5E',
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  deleteButtonTiny: {
+    backgroundColor: '#FF5E5E',
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginLeft: 4,
+  },
+  addButtonText: {
+    color: '#fff',
+    fontSize: 20,
+    fontWeight: 'bold',
+  },
+  deleteButtonText: {
     color: '#fff',
     fontSize: 16,
     fontWeight: 'bold',
   },
-  removeDayButton: {
-    backgroundColor: '#ff4d4d', // Red background for "Remove Day" button
-    paddingVertical: 8,         // Padding above and below the text
-    paddingHorizontal: 15,      // Padding on the sides
-    borderRadius: 5,            // Rounded corners
-    marginTop: 10,              // Space above the button
-    alignItems: 'center',       // Center the text
+  icon: {
+    color: '#FF5E5E',
+    marginLeft: 8,
   },
-  // Remove Day button text
-  removeDayButtonText: {
-    color: '#fff',             // White text color
-    fontSize: 16,              // Font size
-    fontWeight: 'bold',        // Bold text
+  screen: {
+    flex: 1,
+    alignItems: 'flex-start',
+
+  },
+  editButton: {
+    position: 'absolute',
+    bottom: 10,
+    right: 10,
+    backgroundColor: '#ff9800',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 5,
+  },
+  editButtonText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: 'bold',
   },
 
 });

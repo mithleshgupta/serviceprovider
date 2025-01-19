@@ -8,14 +8,14 @@ import {
     Modal,
 } from 'react-native';
 
-const CategoryDropdown = ({ onSelect }) => {
-    const [selectedCategory, setSelectedCategory] = useState('Select Category');
+const SelectCity = ({ onSelect }) => {
+    const [selectedCity, setselectedCity] = useState('Select City');
     const [dropdownVisible, setDropdownVisible] = useState(false);
 
-    const categories = ['Culture', 'Heritage', 'Food'];
+    const cities = ['Delhi', 'Mumbai', 'Kolkata'];
 
     const handleSelect = (category) => {
-        setSelectedCategory(category);
+        setselectedCity(category);
         setDropdownVisible(false);
         onSelect(category); 
     };
@@ -27,7 +27,7 @@ const CategoryDropdown = ({ onSelect }) => {
                 style={styles.dropdownButton}
                 onPress={() => setDropdownVisible(!dropdownVisible)}
             >
-                <Text style={styles.dropdownButtonText}>{selectedCategory}</Text>
+                <Text style={styles.dropdownButtonText}>{selectedCity}</Text>
                 <Text style={styles.dropdownIcon}>▼</Text>
             </TouchableOpacity>
 
@@ -35,7 +35,7 @@ const CategoryDropdown = ({ onSelect }) => {
             {dropdownVisible && (
                 <View style={styles.dropdown}>
                     <FlatList
-                        data={categories}
+                        data={cities}
                         keyExtractor={(item, index) => index.toString()}
                         renderItem={({ item }) => (
                             <TouchableOpacity
@@ -54,7 +54,7 @@ const CategoryDropdown = ({ onSelect }) => {
 
 const styles = StyleSheet.create({
     container: {
-        marginVertical: 5,
+        marginVertical: 1,
     },
     dropdownButton: {
         flexDirection: 'row',
@@ -95,4 +95,4 @@ const styles = StyleSheet.create({
     },
 });
 
-export default CategoryDropdown;
+export default SelectCity;

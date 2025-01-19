@@ -49,7 +49,7 @@ const App = () => {
       <Stack.Navigator initialRouteName={initialRoute} screenOptions={{ headerShown: false }}>
         <Stack.Screen name="Welcome" component={Welcome} />
         <Stack.Screen name="OTP" component={OTP} />
-        <Stack.Screen name="Verification" component={VerificationPage} />
+        {/* <Stack.Screen name="Verification" component={VerificationPage} /> */}
         <Stack.Screen name="Registration" component={Registration} />
         <Stack.Screen name="Tour" component={Tour} />
         <Stack.Screen name="Confirmation" component={Confirmation} />

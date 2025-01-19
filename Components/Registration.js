@@ -7,7 +7,9 @@ import {
   StyleSheet,
   Dimensions,
   Modal,
-  ScrollView
+  ScrollView,
+  Animated,
+  TouchableWithoutFeedback, Keyboard
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useNavigation } from '@react-navigation/native';
@@ -21,24 +23,40 @@ export default function Registration() {
   const [tours, setTours] = useState([{ tour_name: "", tour_id: null }, { tour_name: "", tour_id: null }, { tour_name: "", tour_id: null }, { tour_name: "", tour_id: null }, { tour_name: "", tour_id: null }]);
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [selectedTourIndex, setSelectedTourIndex] = useState(null);
+  const [isMenuVisible, setIsMenuVisible] = useState(false);
+  const slideAnim = useRef(new Animated.Value(width)).current;
+
 
   const navigation = useNavigation();
 
-  const menuRef = useRef(null);
+  const toggleMenu = () => {
+    if (isMenuVisible) {
+      Animated.timing(slideAnim, {
+        toValue: width,
+        duration: 300,
+        useNativeDriver: false,
+      }).start(() => setIsMenuVisible(false));
+    } else {
+      setIsMenuVisible(true);
+      Animated.timing(slideAnim, {
+        toValue: width * 0.3,
+        duration: 300,
+        useNativeDriver: false,
+      }).start();
+    }
+  };
 
-  const showMenu = () => menuRef.current.show();
-  const hideMenu = () => menuRef.current.hide();
+  const handleMenuItemPress = (item) => {
+    if (item === 'Contact Us') {
+      console.log('Navigating to Contact Us...');
 
-  const handleContacts = () => {
-    hideMenu();
+    } else if (item === 'Log Out') {
+      console.log('Logging out...');
 
-    console.log("navigateing to contanct");
-  }
+    }
+    setIsMenuVisible(false);
+  };
 
-  const handleLogout = () => {
-    hideMenu();
-    console.log("navigating to logout");
-  }
 
   useEffect(() => {
     fetchTours();
@@ -159,50 +177,77 @@ export default function Registration() {
 
   return (
     <ScrollView style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.headerText}>Registration</Text>
-        <Menu
-          ref={menuRef}
-          button={
-            <TouchableOpacity onPress={showMenu} style={styles.burgerButton}>
-              <Icon name="menu" size={28} color="#FFF" />
+      <TouchableWithoutFeedback
+        onPress={() => {
+          if (isMenuVisible) toggleMenu();
+          Keyboard.dismiss();
+        }}
+      >
+        <View style={styles.container}>
+          <View style={styles.header}>
+            <Text style={styles.headerText}>Registration</Text>
+            <TouchableOpacity onPress={toggleMenu} style={styles.burgerButton}>
+              <Icon name="menuunfold" size={28} color="#FFF" />
             </TouchableOpacity>
-          }
-        >
-          <MenuItem onPress={handleContactUs}>Contact Us</MenuItem>
-          <MenuItem onPress={handleLogout}>Logout</MenuItem>
-        </Menu>
-      </View>
+          </View>
 
-      <View style={styles.content}>
-        <Text style={styles.welcomeTitle}>Welcome</Text>
-        <Text style={styles.descriptionText}>
-          Here is what you need to do to register your services.
-        </Text>
-
-        {tours.map((tour, index) => (
-          <TouchableOpacity key={index} onPress={() => handleFieldPress(index)}>
-            <View style={styles.tourItem}>
-              <TextInput
-                style={styles.tourInput}
-                placeholder={`+ Experimental Tour/Walk ${index + 1}`}
-                placeholderTextColor="#9095A1"
-                value={tour.tour_name}
-                onChangeText={(text) => handleInputChange(text, index)}
-                editable={false}
-              />
+          {isMenuVisible && (
+            <Animated.View
+              style={[
+                styles.menuContainer,
+                { transform: [{ translateX: slideAnim }] },
+              ]}
+            >
               <TouchableOpacity
-                style={styles.deleteButton}
-                onPress={() => openDeleteModal(index)}
+                style={styles.menuItem}
+                onPress={() => {
+                  console.log('Contact Us');
+                  toggleMenu(); // Close the menu after selecting an item
+                }}
               >
-                <Icon name="delete" size={28}  style={styles.icon} />
+                <Text style={styles.menuText}>Contact Us</Text>
               </TouchableOpacity>
-            </View>
-          </TouchableOpacity>
-        ))}
+              <TouchableOpacity
+                style={styles.menuItem}
+                onPress={() => {
+                  console.log('Log Out');
+                  toggleMenu(); // Close the menu after selecting an item
+                }}
+              >
+                <Text style={styles.menuText}>Log Out</Text>
+              </TouchableOpacity>
+            </Animated.View>
+          )}
 
-      </View>
+          <View style={styles.content}>
+            <Text style={styles.welcomeTitle}>Welcome</Text>
+            <Text style={styles.descriptionText}>
+              Here is what you need to do to register your services.
+            </Text>
 
+            {tours.map((tour, index) => (
+              <TouchableOpacity key={index} onPress={() => handleFieldPress(index)}>
+                <View style={styles.tourItem}>
+                  <TextInput
+                    style={styles.tourInput}
+                    placeholder={`+ Experimental Tour/Walk ${index + 1}`}
+                    placeholderTextColor="#9095A1"
+                    value={tour.tour_name}
+                    onChangeText={(text) => handleInputChange(text, index)}
+                    editable={false}
+                  />
+                  <TouchableOpacity
+                    style={styles.deleteButton}
+                    onPress={() => openDeleteModal(index)}
+                  >
+                    <Icon name="delete" size={28} style={styles.icon} />
+                  </TouchableOpacity>
+                </View>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </View>
+      </TouchableWithoutFeedback>
 
       <Modal
         transparent
@@ -259,6 +304,43 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#FFF',
   },
+  burgerButton: {
+    position: "absolute",
+    right: width * 0.05,
+    alignSelf: "flex-end",
+    padding: 10,
+  },
+  burgerLine: {
+    width: 25,
+    height: 3,
+    backgroundColor: '#FFF',
+    marginVertical: 2,
+    borderRadius: 2,
+  },
+  menuContainer: {
+    position: 'absolute',
+    top: 10,
+    bottom: 0,
+    width: width * 0.7,
+    height: height * 0.2,
+    backgroundColor: '#FFF',
+    borderLeftWidth: 1,
+    borderColor: '#DDD',
+    paddingTop: height * 0.04,
+    elevation: 5,
+    zIndex: 1000,
+    right: 0,
+  },
+  menuItem: {
+    paddingVertical: 20,
+    paddingHorizontal: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E0E0E0',
+  },
+  menuText: {
+    fontSize: 18,
+    color: '#333',
+  },
   content: {
     padding: width * 0.05,
   },
@@ -295,7 +377,7 @@ const styles = StyleSheet.create({
     paddingVertical: 5,
   },
   deleteButton: {
-    
+
 
     width: width * 0.1,
     height: height * 0.03,
