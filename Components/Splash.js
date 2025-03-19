@@ -1,13 +1,28 @@
 import React, { useEffect } from 'react';
 import { View, Image, StyleSheet } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export default function Splash() {
     const navigation = useNavigation();
 
     useEffect(() => {
+        const checkTokenAndNavigate = async () => {
+            try {
+                const token = await AsyncStorage.getItem('token');
+                if (token) {
+                    navigation.navigate('Registration');
+                } else {
+                    navigation.navigate('Welcome');
+                }
+            } catch (error) {
+                console.error('Error checking token:', error);
+                navigation.navigate('Welcome');
+            }
+        };
+
         const timer = setTimeout(() => {
-            navigation.navigate('Welcome');
+            checkTokenAndNavigate();
         }, 2000);
 
         return () => clearTimeout(timer);
@@ -15,7 +30,7 @@ export default function Splash() {
 
     return (
         <View style={styles.container}>
-            <Image source={require('../assets/splash.png')} style={styles.image} />
+            <Image source={require('../assets/STORYElogofinal.png')} style={styles.image} />
         </View>
     );
 }
@@ -23,13 +38,13 @@ export default function Splash() {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#FF3C3C',
+        backgroundColor: '#E3292C',
         justifyContent: 'center',
         alignItems: 'center',
     },
     image: {
-        width: 200,
-        height: 200,
+        width: 400,
+        height: 40000,
         resizeMode: 'contain',
     },
 });

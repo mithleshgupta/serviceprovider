@@ -5,49 +5,73 @@ import {
     TouchableOpacity,
     FlatList,
     StyleSheet,
-    Modal,
 } from 'react-native';
+import Modal from 'react-native-modal';
 
 const SelectCity = ({ onSelect }) => {
-    const [selectedCity, setselectedCity] = useState('Select City');
+    const [selectedCity, setSelectedCity] = useState('Select City');
     const [dropdownVisible, setDropdownVisible] = useState(false);
 
-    const cities = ['Delhi', 'Mumbai', 'Kolkata'];
+    const cities = [
+        { id: 1, name: 'Agra' },
+        { id: 2, name: 'Amritsar' },
+        { id: 3, name: 'Bangalore' },
+        { id: 4, name: 'Bhopal' },
+        { id: 5, name: 'Chennai' },
+        { id: 6, name: 'Delhi' },
+        { id: 7, name: 'Goa' },
+        { id: 8, name: 'Hyderabad' },
+        { id: 9, name: 'Jaipur' },
+        { id: 10, name: 'Kashmir' },
+        { id: 11, name: 'Kochi' },
+        { id: 12, name: 'Kolkata' },
+        { id: 13, name: 'Ladakh' },
+        { id: 14, name: 'Lucknow' },
+        { id: 15, name: 'Manali' },
+        { id: 16, name: 'Mumbai' },
+        { id: 17, name: 'Pondicherry' },
+        { id: 18, name: 'Rishikesh' },
+        { id: 19, name: 'Shimla' },
+        { id: 20, name: 'Udaipur' },
+        { id: 21, name: 'Varanasi' },
+    ];
 
-    const handleSelect = (category) => {
-        setselectedCity(category);
+    const handleSelect = (city) => {
+        setSelectedCity(city.name);
         setDropdownVisible(false);
-        onSelect(category); 
+        onSelect(city.id);
     };
 
     return (
         <View style={styles.container}>
-            
             <TouchableOpacity
                 style={styles.dropdownButton}
-                onPress={() => setDropdownVisible(!dropdownVisible)}
+                onPress={() => setDropdownVisible(true)}
             >
                 <Text style={styles.dropdownButtonText}>{selectedCity}</Text>
                 <Text style={styles.dropdownIcon}>▼</Text>
             </TouchableOpacity>
 
-            
-            {dropdownVisible && (
-                <View style={styles.dropdown}>
+            <Modal
+                isVisible={dropdownVisible}
+                onBackdropPress={() => setDropdownVisible(false)}
+                style={styles.bottomModal}
+            >
+                <View style={styles.modalContent}>
                     <FlatList
                         data={cities}
-                        keyExtractor={(item, index) => index.toString()}
+                        keyExtractor={(item) => item.id.toString()}
                         renderItem={({ item }) => (
                             <TouchableOpacity
                                 style={styles.dropdownOption}
                                 onPress={() => handleSelect(item)}
                             >
-                                <Text style={styles.dropdownOptionText}>{item}</Text>
+                                <Text style={styles.dropdownOptionText}>{item.name}</Text>
                             </TouchableOpacity>
                         )}
                     />
                 </View>
-            )}
+            </Modal>
         </View>
     );
 };
@@ -60,7 +84,6 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-       
         borderColor: '#ccc',
         borderRadius: 5,
         paddingVertical: 12,
@@ -69,19 +92,25 @@ const styles = StyleSheet.create({
     },
     dropdownButtonText: {
         fontSize: 16,
+        fontWeight: "600",
         color: '#333',
     },
     dropdownIcon: {
         fontSize: 18,
         color: '#FF5E5E',
-        marginHorizontal:10 
+        marginHorizontal: 10
     },
-    dropdown: {
-        
-        borderColor: '#ccc',
-        
-        marginTop: 5,
-        backgroundColor: '#fff',
+    bottomModal: {
+        justifyContent: 'flex-end',
+        margin: 0,
+    },
+    modalContent: {
+        backgroundColor: 'white',
+        padding: 22,
+        borderTopLeftRadius: 17,
+        borderTopRightRadius: 17,
+        borderColor: 'rgba(0, 0, 0, 0.1)',
+        maxHeight: '70%',
     },
     dropdownOption: {
         paddingVertical: 10,
@@ -92,6 +121,7 @@ const styles = StyleSheet.create({
     dropdownOptionText: {
         fontSize: 16,
         color: '#333',
+        textAlign: 'center',
     },
 });
 

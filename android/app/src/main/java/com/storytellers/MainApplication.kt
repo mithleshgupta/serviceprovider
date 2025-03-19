@@ -1,4 +1,4 @@
-package com.serviceapp
+package com.storytellers 
 
 import android.app.Application
 import com.facebook.react.PackageList

@@ -15,48 +15,51 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useNavigation } from '@react-navigation/native';
 import { BASE_URL } from '@env';
 import Icon from 'react-native-vector-icons/AntDesign';
-import Menu, { MenuItem } from 'react-native-material-menu';
+import RBSheet from 'react-native-raw-bottom-sheet';
 
 const { width, height } = Dimensions.get('window');
 
 export default function Registration() {
-  const [tours, setTours] = useState([{ tour_name: "", tour_id: null }, { tour_name: "", tour_id: null }, { tour_name: "", tour_id: null }, { tour_name: "", tour_id: null }, { tour_name: "", tour_id: null }]);
+  const [tours, setTours] = useState([
+    { tour_name: "", tour_id: null },
+    { tour_name: "", tour_id: null },
+    { tour_name: "", tour_id: null },
+    { tour_name: "", tour_id: null },
+    { tour_name: "", tour_id: null },
+  ]);
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [selectedTourIndex, setSelectedTourIndex] = useState(null);
-  const [isMenuVisible, setIsMenuVisible] = useState(false);
-  const slideAnim = useRef(new Animated.Value(width)).current;
-
-
+  const [isContactUsModalVisible, setIsContactUsModalVisible] = useState(false);
+  const [isLogoutModalVisible, setIsLogoutModalVisible] = useState(false);
+  const refRBSheet = useRef();
   const navigation = useNavigation();
 
   const toggleMenu = () => {
-    if (isMenuVisible) {
-      Animated.timing(slideAnim, {
-        toValue: width,
-        duration: 300,
-        useNativeDriver: false,
-      }).start(() => setIsMenuVisible(false));
-    } else {
-      setIsMenuVisible(true);
-      Animated.timing(slideAnim, {
-        toValue: width * 0.3,
-        duration: 300,
-        useNativeDriver: false,
-      }).start();
-    }
+    refRBSheet.current.open();
   };
 
   const handleMenuItemPress = (item) => {
     if (item === 'Contact Us') {
-      console.log('Navigating to Contact Us...');
-
+      setIsContactUsModalVisible(true);
     } else if (item === 'Log Out') {
-      console.log('Logging out...');
-
+      setIsLogoutModalVisible(true);
     }
-    setIsMenuVisible(false);
+    refRBSheet.current.close();
   };
 
+  const handleContactUsClose = () => {
+    setIsContactUsModalVisible(false);
+  };
+
+  const handleLogoutClose = () => {
+    setIsLogoutModalVisible(false);
+  };
+
+  const handleLogout = async () => {
+    await AsyncStorage.removeItem('token');
+    navigation.navigate('Welcome');
+    setIsLogoutModalVisible(false);
+  };
 
   useEffect(() => {
     fetchTours();
@@ -68,11 +71,12 @@ export default function Registration() {
 
       if (!token) {
         console.error("Error: Authentication token is missing");
+        navigation.navigate("Welcome");
         return;
       }
 
       const response = await fetch(
-        `https://correctedservice-production.up.railway.app/api/tours/user/tourTitles`,
+        `https://latestservice-production.up.railway.app/api/tours/user/tourTitles`,
         {
           method: "GET",
           headers: {
@@ -84,7 +88,12 @@ export default function Registration() {
 
       const data = await response.json();
 
-      if (response.ok && data.success) {
+      if (response.ok) {
+        if (data.tours.length === 0) {
+          console.log("No tours found. Prompt user to create one.");
+          return;
+        }
+
         const updatedTours = data.tours.map((tour) => ({
           tour_name: tour.tour_name,
           tour_id: tour.tour_id,
@@ -98,17 +107,29 @@ export default function Registration() {
           }),
         ];
         setTours(finalTours);
+      } else if (response.status === 401) {
+        console.error("Token expired or invalid");
+
+        Alert.alert(
+          "Session Expired",
+          "Your session has expired. Please log in again.",
+          [
+            {
+              text: "OK",
+              onPress: () => {
+                navigation.navigate("Welcome");
+              },
+            },
+          ],
+          { cancelable: false }
+        );
       } else {
-        console.error("Error:", data.message || "Failed to fetch tours");
+        console.error("Error about the token:", data.message || "Failed to fetch tours");
       }
     } catch (error) {
       console.error("Error fetching tours:", error.message || error);
     }
   };
-
-
-
-
 
   const openDeleteModal = (index) => {
     setSelectedTourIndex(index);
@@ -126,7 +147,7 @@ export default function Registration() {
 
     try {
       const response = await fetch(
-        `https://correctedservice-production.up.railway.app/api/tours/delete/${selectedTour.tour_id}`,
+        `https://latestservice-production.up.railway.app/api/tours/delete/${selectedTour.tour_id}`,
         {
           method: "DELETE",
           headers: {
@@ -142,8 +163,6 @@ export default function Registration() {
         console.log("Success:", data.message || "Tour deleted successfully");
         setIsModalVisible(false);
         setSelectedTourIndex(null);
-
-        // Refresh the tours list
         fetchTours();
       } else {
         console.error("Error:", data.message || "Failed to delete tour");
@@ -152,8 +171,6 @@ export default function Registration() {
       console.error("Error deleting tour:", error.message || error);
     }
   };
-
-
 
   const closeModal = () => {
     setIsModalVisible(false);
@@ -169,9 +186,9 @@ export default function Registration() {
   const handleFieldPress = (index) => {
     const selectedTour = tours[index];
     console.log("this is selected", selectedTour);
-    navigation.navigate('Tour', {
+    navigation.navigate("Tour", {
       tourId: selectedTour.tour_id || null,
-      tourName: selectedTour.tour_name || ""
+      tourName: selectedTour.tour_name || "",
     });
   };
 
@@ -179,7 +196,6 @@ export default function Registration() {
     <ScrollView style={styles.container}>
       <TouchableWithoutFeedback
         onPress={() => {
-          if (isMenuVisible) toggleMenu();
           Keyboard.dismiss();
         }}
       >
@@ -190,34 +206,6 @@ export default function Registration() {
               <Icon name="menuunfold" size={28} color="#FFF" />
             </TouchableOpacity>
           </View>
-
-          {isMenuVisible && (
-            <Animated.View
-              style={[
-                styles.menuContainer,
-                { transform: [{ translateX: slideAnim }] },
-              ]}
-            >
-              <TouchableOpacity
-                style={styles.menuItem}
-                onPress={() => {
-                  console.log('Contact Us');
-                  toggleMenu(); // Close the menu after selecting an item
-                }}
-              >
-                <Text style={styles.menuText}>Contact Us</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.menuItem}
-                onPress={() => {
-                  console.log('Log Out');
-                  toggleMenu(); // Close the menu after selecting an item
-                }}
-              >
-                <Text style={styles.menuText}>Log Out</Text>
-              </TouchableOpacity>
-            </Animated.View>
-          )}
 
           <View style={styles.content}>
             <Text style={styles.welcomeTitle}>Welcome</Text>
@@ -230,11 +218,12 @@ export default function Registration() {
                 <View style={styles.tourItem}>
                   <TextInput
                     style={styles.tourInput}
-                    placeholder={`+ Experimental Tour/Walk ${index + 1}`}
+                    placeholder={`+ Experiential/Immersive Walk`}
                     placeholderTextColor="#9095A1"
                     value={tour.tour_name}
                     onChangeText={(text) => handleInputChange(text, index)}
                     editable={false}
+                    multiline={true}
                   />
                   <TouchableOpacity
                     style={styles.deleteButton}
@@ -259,26 +248,108 @@ export default function Registration() {
           <View style={styles.modalContainer}>
             <Text style={styles.modalTitle}>Confirm Deletion</Text>
             <Text style={styles.modalText}>
-              Are you sure you want to delete Experimental Tour/Walk{' '}
-              {selectedTourIndex + 1}?
+              Are you sure you want to delete Experimental Tour/Walk {selectedTourIndex + 1}?
             </Text>
             <View style={styles.modalButtons}>
-              <TouchableOpacity
-                style={styles.cancelButton}
-                onPress={closeModal}
-              >
+              <TouchableOpacity style={styles.cancelButton} onPress={closeModal}>
                 <Text style={styles.cancelButtonText}>Cancel</Text>
               </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.confirmButton}
-                onPress={handleDelete}
-              >
+              <TouchableOpacity style={styles.confirmButton} onPress={handleDelete}>
                 <Text style={styles.confirmButtonText}>Delete</Text>
               </TouchableOpacity>
             </View>
           </View>
         </View>
       </Modal>
+
+      <Modal
+        transparent
+        animationType="fade"
+        visible={isContactUsModalVisible}
+        onRequestClose={handleContactUsClose}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContainer}>
+            <Text style={styles.modalTitle}>Contact Us</Text>
+            <Text style={styles.modalText}>Email: contact@thestorye.in</Text>
+            <TouchableOpacity
+              style={styles.cancelButton}
+              onPress={handleContactUsClose}
+            >
+              <Text style={styles.cancelButtonText}>Close</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal
+        transparent
+        animationType="fade"
+        visible={isLogoutModalVisible}
+        onRequestClose={handleLogoutClose}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContainer}>
+            <Text style={styles.modalTitle}>Log Out</Text>
+            <Text style={styles.modalText}>
+              Are you sure you want to log out?
+            </Text>
+            <View style={styles.modalButtons}>
+              <TouchableOpacity style={styles.cancelButton} onPress={handleLogoutClose}>
+                <Text style={styles.cancelButtonText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.confirmButton} onPress={handleLogout}>
+                <Text style={styles.confirmButtonText}>Log Out</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Bottom Sheet */}
+      <RBSheet
+        ref={refRBSheet}
+        closeOnDragDown={true}
+        closeOnPressMask={true}
+        customStyles={{
+          wrapper: {
+            backgroundColor: 'rgba(0, 0, 0, 0.4)', // Semi-transparent dark overlay
+          },
+          draggableIcon: {
+            backgroundColor: '#555', // Softer contrast
+            width: 50, // Makes it more visible
+            height: 5,
+            borderRadius: 3,
+            marginVertical: 5,
+          },
+          container: {
+            borderTopLeftRadius: 25, // More rounded corners
+            borderTopRightRadius: 25,
+            backgroundColor: 'rgba(255, 255, 255, 0.95)', // Softer, more modern transparency
+            backdropFilter: 'blur(15px)', // Enhances glassy effect
+            shadowColor: '#000',
+            shadowOpacity: 0.2,
+            shadowOffset: { width: 0, height: -3 },
+            shadowRadius: 12,
+            paddingHorizontal: 15, // Better spacing inside
+            paddingBottom: 20,
+          },
+        }}
+      >
+        <View style={styles.bottomSheet}>
+          <TouchableOpacity style={styles.closeButton} onPress={() => refRBSheet.current.close()}>
+            <Icon name="close" size={28} color="#333" />
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.bottomSheetItem} onPress={() => handleMenuItemPress("Contact Us")}>
+            <Icon name="mail" size={20} color="#333" style={styles.bottomSheetIcon} />
+            <Text style={styles.bottomSheetText}>Contact Us</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.bottomSheetItem} onPress={() => handleMenuItemPress("Log Out")}>
+            <Icon name="logout" size={20} color="#333" style={styles.bottomSheetIcon} />
+            <Text style={styles.bottomSheetText}>Log Out</Text>
+          </TouchableOpacity>
+        </View>
+      </RBSheet>
     </ScrollView>
   );
 }
@@ -289,7 +360,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFF',
   },
   header: {
-    backgroundColor: '#FF5E5E',
+    backgroundColor: '#DE3B40',
     paddingVertical: height * 0.03,
     paddingHorizontal: width * 0.05,
     height: height * 0.1,
@@ -317,27 +388,27 @@ const styles = StyleSheet.create({
     marginVertical: 2,
     borderRadius: 2,
   },
-  menuContainer: {
+  popupCard: {
     position: 'absolute',
-    top: 10,
-    bottom: 0,
-    width: width * 0.7,
-    height: height * 0.2,
+    top: height * 0.1,
+    right: width * 0.05,
+    width: width * 0.6,
     backgroundColor: '#FFF',
-    borderLeftWidth: 1,
-    borderColor: '#DDD',
-    paddingTop: height * 0.04,
+    borderRadius: 10,
     elevation: 5,
+    shadowColor: '#000',
+    shadowOpacity: 0.3,
+    shadowOffset: { width: 0, height: 2 },
+    shadowRadius: 4,
+    padding: 20,
     zIndex: 1000,
-    right: 0,
   },
-  menuItem: {
-    paddingVertical: 20,
-    paddingHorizontal: 20,
+  popupMenuItem: {
+    paddingVertical: 15,
     borderBottomWidth: 1,
     borderBottomColor: '#E0E0E0',
   },
-  menuText: {
+  popupMenuText: {
     fontSize: 18,
     color: '#333',
   },
@@ -360,7 +431,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-
     borderBottomColor: '#E0E0E0',
     paddingVertical: height * 0.015,
     marginBottom: height * 0.02,
@@ -377,25 +447,18 @@ const styles = StyleSheet.create({
     paddingVertical: 5,
   },
   deleteButton: {
-
-
     width: width * 0.1,
     height: height * 0.03,
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: 3,
-
   },
   deleteButtonText: {
     color: '#FFF',
-    fontWeight: '700', // Bold text
-    fontSize: width * 0.05, // Adjusted font size to fit the modern button
+    fontWeight: '700',
+    fontSize: width * 0.05,
     textAlign: 'center',
   },
-
-
-
-  // Modal Styles
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.4)',
@@ -423,23 +486,25 @@ const styles = StyleSheet.create({
     fontSize: 16,
     marginBottom: 20,
     textAlign: 'center',
+    alignContent: 'center',
   },
   modalButtons: {
     flexDirection: 'row',
     justifyContent: 'space-between',
   },
   cancelButton: {
-    backgroundColor: '#E0E0E0',
+    backgroundColor: '#DE3B40',
     paddingVertical: 8,
     paddingHorizontal: 20,
     borderRadius: 5,
   },
   cancelButtonText: {
+    textAlign: 'center',
     fontWeight: '600',
-    color: '#333',
+    color: 'white',
   },
   confirmButton: {
-    backgroundColor: '#FF6E6E',
+    backgroundColor: '#DE3B40',
     paddingVertical: 8,
     paddingHorizontal: 20,
     borderRadius: 5,
@@ -447,5 +512,41 @@ const styles = StyleSheet.create({
   confirmButtonText: {
     fontWeight: '600',
     color: '#FFF',
+  },
+  bottomSheet: {
+    width: '100%',
+    backgroundColor: 'rgba(255, 255, 255, 0.95)', // Lighter & more modern
+    paddingVertical: 20,
+    paddingHorizontal: 20,
+    borderTopLeftRadius: 25,
+    borderTopRightRadius: 25,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOpacity: 0.15,
+    shadowOffset: { width: 0, height: -2 },
+    shadowRadius: 10,
+  },
+  closeButton: {
+    position: 'absolute',
+    top: 10,
+    right: 10,
+  },
+  bottomSheetItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 18,
+    width: '100%',
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(0, 0, 0, 0.1)', // Subtle separator
+  },
+  bottomSheetIcon: {
+    marginRight: 10,
+  },
+  bottomSheetText: {
+    fontSize: 18,
+    color: '#333',
+    textAlign: 'center',
+    fontWeight: '600',
   },
 });

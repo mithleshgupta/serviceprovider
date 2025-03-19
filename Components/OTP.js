@@ -47,8 +47,8 @@ const OTP = () => {
         try {
             const endpoint =
                 action === "signup"
-                    ? `https://correctedservice-production.up.railway.app/api/auth/verify-signup-otp`
-                    : `https://correctedservice-production.up.railway.app/api/auth/login-verify`;
+                    ? `https://latestservice-production.up.railway.app/api/auth/verify-signup-otp`
+                    : `https://latestservice-production.up.railway.app/api/auth/login-verify`;
 
             const response = await fetch(endpoint, {
                 method: "POST",
@@ -95,7 +95,7 @@ const OTP = () => {
                 ))}
             </View>
             <Text style={styles.description}>
-               Enter the four-digit code sent to your entered email address
+                Enter the four-digit code sent to your entered email address
             </Text>
 
             <TouchableOpacity style={styles.button} onPress={handleVerifyOtp}>
@@ -144,7 +144,7 @@ const styles = StyleSheet.create({
         marginTop: height * 0.02,
     },
     button: {
-        marginTop:50,
+        marginTop: 50,
         width: "90%",
         height: height * 0.06,
         justifyContent: "center",

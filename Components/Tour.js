@@ -13,6 +13,9 @@ import {
   DatePickerIOS,
   FlatList,
   Button,
+  Modal,
+  ActivityIndicator,
+  Alert,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
 import Swiper from 'react-native-swiper';
@@ -20,6 +23,7 @@ import { launchImageLibrary } from 'react-native-image-picker';
 import DateTimePickerModal from 'react-native-modal-datetime-picker';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import DeleteIcon from 'react-native-vector-icons/AntDesign';
+import ImagePicker from 'react-native-image-crop-picker';
 
 import TimeSlotPicker from './TimeSlotPicker ';
 import DayTimeList from './DayTimeList';
@@ -42,14 +46,19 @@ export default function Tour() {
   const { tourId, tourName } = route.params;
   const [selectedTourId, setSelectedTourId] = useState(null);
   const [selectedCityId, setSelectedCityId] = useState(null);
+  const [isLoading, setIsLoading] = useState(false);
 
   const [media, setMedia] = useState([]);
   const [languages, setLanguages] = useState('');
   const [price, setPrice] = useState('');
   const [description, setDescription] = useState('');
+  const [wordCount, setWordCount] = useState(0);
+
   const [duration, setDuration] = useState('');
   const [leaderName, setLeaderName] = useState('');
   const [leaderImage, setLeaderImage] = useState(null);
+  const [coverPhoto, setcoverPhoto] = useState(null);
+
   const [leaderDescription, setLeaderDescription] = useState('');
   const [daysData, setDaysData] = useState([]);
   const [timeRanges, setTimeRanges] = useState([]);
@@ -63,6 +72,8 @@ export default function Tour() {
   const [dayText, setDayText] = useState('');
   const [timeText, setTimeText] = useState('');
   const [activeDayId, setActiveDayId] = useState(null);
+  const [leaderDescriptionWordCount, setLeaderDescriptionWordCount] = useState(0);
+
 
   const addInclude = () => {
     if (includeText.trim() !== '') {
@@ -71,7 +82,24 @@ export default function Tour() {
     }
   };
 
+  const handleDescriptionChange = (text) => {
 
+    const wordCount = text.split(/\s+/).filter(Boolean).length;
+
+    if (wordCount <= 250) {
+      setDescription(text);
+      setWordCount(wordCount);
+    }
+  };
+
+  const handleLeaderDescriptionChange = (text) => {
+    const wordCount = text.split(/\s+/).filter(Boolean).length;
+
+    if (wordCount <= 150) {
+      setLeaderDescription(text);
+      setLeaderDescriptionWordCount(wordCount);
+    }
+  };
 
   const addExclude = () => {
     if (excludeText.trim() !== '') {
@@ -82,43 +110,46 @@ export default function Tour() {
 
 
   const addDay = () => {
-    if (dayText.trim() !== '') {
-      setDays([
-        ...days,
-        { id: Date.now().toString(), day: dayText, times: [] },
-      ]);
+    if (dayText.trim()) {
+      const newDay = {
+        id: new Date().getTime().toString(),
+        day: dayText,
+        times: [],
+      };
+      setDays([...days, newDay]);
       setDayText('');
-      setActiveDayId(null);
     }
   };
 
 
-  const addTime = () => {
-    if (timeText.trim() !== '' && activeDayId) {
-      setDays(
-        days.map((day) =>
-          day.id === activeDayId
-            ? { ...day, times: [...day.times, timeText.trim()] }
-            : day
-        )
-      );
+  const addTime = (dayId) => {
+    if (timeText.trim()) {
+      const updatedDays = days.map((item) => {
+        if (item.id === dayId) {
+          return { ...item, times: [...item.times, timeText] };
+        }
+        return item;
+      });
+      setDays(updatedDays);
       setTimeText('');
     }
   };
 
   const deleteTime = (dayId, timeIndex) => {
-    setDays(
-      days.map((day) =>
-        day.id === dayId
-          ? { ...day, times: day.times.filter((_, index) => index !== timeIndex) }
-          : day
-      )
-    );
+    const updatedDays = days.map((item) => {
+      if (item.id === dayId) {
+        const updatedTimes = item.times.filter((_, index) => index !== timeIndex);
+        return { ...item, times: updatedTimes };
+      }
+      return item;
+    });
+    setDays(updatedDays);
   };
 
 
   const deleteDay = (dayId) => {
-    setDays(days.filter((day) => day.id !== dayId));
+    const updatedDays = days.filter((item) => item.id !== dayId);
+    setDays(updatedDays);
   };
 
 
@@ -137,7 +168,7 @@ export default function Tour() {
 
         try {
           const response = await fetch(
-            `https://correctedservice-production.up.railway.app/api/tours/tours/${tourId}`,
+            `https://latestservice-production.up.railway.app/api/tours/tours/${tourId}`,
             {
               method: 'GET',
               headers: {
@@ -146,51 +177,75 @@ export default function Tour() {
               },
             }
           );
+
           const data = await response.json();
-          console.log("Fetched Data: ", data);
 
           if (response.ok && data.success) {
             const tourData = data.tour;
 
-
             setTitle(tourData.tour_name);
+            setDescription(tourData.tour_description);
             setLanguages(tourData.languages.join(','));
             setPrice(tourData.ticket_price);
-            setDescription(tourData.tour_description);
             setLeaderName(tourData.leader_name);
             setLeaderDescription(tourData.leader_description);
-
-
-            if (tourData.tour_days && tourData.tour_timings) {
-              const formattedDaysData = tourData.tour_days.map((day, index) => {
-                const timings = tourData.tour_timings[index].timings || [];
-                return {
-                  day,
-                  timeRanges: timings.map(timing => ({
-                    startTime: timing.start_time,
-                    endTime: timing.end_time,
-                  })),
-                };
-              });
-              setDaysData(formattedDaysData);
-            }
-
-            setMedia(
-              tourData.media.map(item => ({
-                uri: item.media_url,
-                type: item.type,
-              }))
-            );
-
-            if (tourData.leader_profile_pic) {
-              setLeaderImage({ uri: tourData.leader_profile_pic });
-            }
-
             setContactInfo({
               name: tourData.guide_name,
               email: tourData.guide_email_id,
               phone: tourData.guide_phone,
             });
+
+            if (tourData.cover_photo) {
+              setcoverPhoto({ uri: tourData.cover_photo });
+            }
+
+            if (tourData.leader_profile_pic) {
+              setLeaderImage({ uri: tourData.leader_profile_pic });
+            }
+
+            if (tourData.media) {
+              setMedia(
+                tourData.media.map((item) => ({
+                  uri: item.media_url,
+                  type: item.type,
+                }))
+              );
+            }
+
+
+            if (tourData.tour_days) {
+              const parsedDays = tourData.tour_days.map((day) => ({
+                id: Math.random().toString(36).substring(7),
+                day: day.day.trim(),
+                times: day.times.map((time) => time.trim()),
+              }));
+              setDays(parsedDays);
+            }
+
+            if (tourData.tour_duration) {
+              setDuration(tourData.tour_duration.trim());
+            }
+
+
+            if (tourData.meeting_point) {
+              setMeetingPoint(tourData.meeting_point);
+            }
+
+            if (tourData.tour_includes) {
+              setTourIncludes(tourData.tour_includes);
+            }
+
+            if (tourData.tour_excludes) {
+              setTourExcludes(tourData.tour_excludes);
+            }
+
+            if (tourData.category_id) {
+              setSelectedTourId(tourData.category_id);
+            }
+
+            if (tourData.city_id) {
+              setSelectedCityId(tourData.city_id);
+            }
           } else {
             Alert.alert('Error', data.message || 'Failed to fetch tour data');
           }
@@ -208,46 +263,83 @@ export default function Tour() {
 
 
 
-  const API_BASE_URL = 'https://correctedservice-production.up.railway.app/api/tours';
 
 
-  const prepareFormData = (formattedData, leaderImage, media) => {
+
+
+  const API_BASE_URL = 'https://latestservice-production.up.railway.app/api/tours';
+
+
+  const prepareFormData = (formattedData, leaderImage, media, coverPhoto, days, meetingPoint, tourIncludes, tourExcludes) => {
     const formData = new FormData();
 
-    // Add all text fields
+
     Object.keys(formattedData).forEach((key) => {
       formData.append(key, formattedData[key]);
     });
 
-    // Leader profile picture
+
     if (leaderImage) {
       if (leaderImage.uri && leaderImage.uri.startsWith('file://')) {
-        // Local file
         formData.append('leader_profile_pic', {
           uri: normalizeUri(leaderImage.uri),
           type: leaderImage.type || mime.getType(leaderImage.uri),
           name: leaderImage.fileName || leaderImage.uri.split('/').pop(),
         });
       } else if (leaderImage.uri) {
-        // S3 URL
         formData.append('leader_profile_pic', leaderImage.uri);
       }
     }
 
-    // Media files
+
+    if (coverPhoto) {
+      if (coverPhoto.uri && coverPhoto.uri.startsWith('file://')) {
+        formData.append('cover_photo', {
+          uri: normalizeUri(coverPhoto.uri),
+          type: coverPhoto.type || mime.getType(coverPhoto.uri),
+          name: coverPhoto.fileName || coverPhoto.uri.split('/').pop(),
+        });
+      } else if (coverPhoto.uri) {
+        formData.append('cover_photo', coverPhoto.uri);
+      }
+    }
+
+
     if (media && media.length > 0) {
       media.forEach((file) => {
         if (file.uri && file.uri.startsWith('file://')) {
-          // Local file
           formData.append('media', {
             uri: normalizeUri(file.uri),
             type: mime.getType(file.uri),
             name: file.fileName || file.uri.split('/').pop(),
           });
         } else if (file.uri) {
-          // S3 URL
           formData.append('media', file.uri);
         }
+      });
+    }
+
+
+    if (meetingPoint) {
+      formData.append('meeting_point', meetingPoint);
+    }
+
+
+    if (tourIncludes && tourIncludes.length > 0) {
+      formData.append('tour_includes', JSON.stringify(tourIncludes));
+    }
+
+    if (tourExcludes && tourExcludes.length > 0) {
+      formData.append('tour_excludes', JSON.stringify(tourExcludes));
+    }
+
+
+    if (days && days.length > 0) {
+      days.forEach(day => {
+        formData.append('days', JSON.stringify({
+          day: day.day,
+          times: day.times,
+        }));
       });
     }
 
@@ -257,7 +349,6 @@ export default function Tour() {
 
 
   const handleUpdate = async () => {
-
     const token = await AsyncStorage.getItem('token');
     if (!token) {
       Alert.alert('Error', 'Authentication token is missing');
@@ -265,6 +356,7 @@ export default function Tour() {
     }
 
     try {
+      setIsLoading(true);
       const formattedData = {
         tour_name: title,
         tour_title: title,
@@ -273,28 +365,25 @@ export default function Tour() {
         ticket_price: price,
         leader_name: leaderName,
         leader_description: leaderDescription,
-        tour_days: JSON.stringify(daysData.map((day) => day.day)),
-
-        // Map the day and time ranges into the correct format for 'tour_timings'
-        tour_timings: JSON.stringify(
-          daysData.map((day) => ({
-            day: day.day,
-            timings: day.timeRanges.map((timeRange) => ({
-              start_time: timeRange.startTime,
-              end_time: timeRange.endTime,
-            })),
-          }))
-        ),
-
-
         guide_name: contactInfo.name,
         guide_email_id: contactInfo.email,
         guide_phone: contactInfo.phone,
         category_id: selectedTourId,
-        cities: JSON.stringify(["Pondicherry"]),
+        city_id: selectedCityId,
+        tour_duration: duration,
       };
 
-      const formData = prepareFormData(formattedData, leaderImage, media);
+
+      const formData = prepareFormData(
+        formattedData,
+        leaderImage,
+        media,
+        coverPhoto,
+        days,
+        meetingPoint,
+        tourIncludes,
+        tourExcludes
+      );
 
       const response = await fetch(
         `${API_BASE_URL}/${tourId ? `update/${tourId}` : 'create'}`,
@@ -307,6 +396,7 @@ export default function Tour() {
         }
       );
 
+
       const result = await response.json();
 
       if (response.ok && result.success) {
@@ -318,6 +408,10 @@ export default function Tour() {
       console.error('Error:', error);
       Alert.alert('Error', 'Something went wrong. Please try again later.');
     }
+    finally {
+      setIsLoading(false);
+    }
+
   };
 
 
@@ -330,78 +424,128 @@ export default function Tour() {
   });
 
   const pickMedia = async () => {
-    const options = {
-      mediaType: 'mixed',
-      selectionLimit: 4,
-    };
-
-    launchImageLibrary(options, (response) => {
-      if (!response.didCancel && !response.errorCode) {
-        const selected = response.assets?.filter(
-          (item) =>
-            (item.type?.includes('image') && item.fileSize <= 10000000) ||
-            (item.type?.includes('video') && item.fileSize <= 50000000)
-        );
-
-        if (selected) {
-          const updatedMedia = [...media, ...selected].slice(0, 4);
-          setMedia(updatedMedia);
+    ImagePicker.openPicker({
+      mediaType: 'any',
+      cropping: false,
+      multiple: true,
+      compressImageQuality: 0.8,
+    }).then(response => {
+      const validItems = response.filter(item => {
+        if (item.mime.includes('image') && item.size <= 100000) {
+          return true;
+        } else if (item.mime.includes('video') && item.size <= 50000000) {
+          return true;
+        } else {
+          Alert.alert('Size Exceeded', `Selected ${item.mime.includes('image') ? 'image' : 'video'} exceeds the size limit.`);
+          return false;
         }
-      }
+      }).map(item => ({
+        uri: item.path,
+        type: item.mime,
+        fileName: item.path.split('/').pop(),
+      }));
+
+      const updatedMedia = [...media, ...validItems].slice(0, 4);
+      setMedia(updatedMedia);
+    }).catch(error => {
+      console.error('Error picking media:', error);
     });
   };
 
+
   const editMedia = async (index) => {
-    const options = {
-      mediaType: 'mixed',
-      selectionLimit: 1,
-    };
-
-    launchImageLibrary(options, (response) => {
-      if (!response.didCancel && !response.errorCode) {
-        const selected = response.assets?.[0];
-
-        if (selected) {
-          if (
-            (selected.type?.includes('image') && selected.fileSize <= 10000000) ||
-            (selected.type?.includes('video') && selected.fileSize <= 50000000)
-          ) {
-            const updatedMedia = [...media];
-            updatedMedia[index] = selected; // Replace media at the specific index
-            setMedia(updatedMedia);
-          } else {
-            Alert.alert('Error', 'Selected media exceeds allowed size limits.');
-          }
+    const mediaItem = media[index];
+    if (mediaItem.type.includes('image')) {
+      ImagePicker.openPicker({
+        mediaType: 'photo',
+        cropping: true,
+        width: 800,
+        height: 800,
+        compressImageQuality: 0.8,
+      }).then(image => {
+        if (image.size <= 100000) {
+          const updatedMedia = [...media];
+          updatedMedia[index] = { uri: image.path, type: image.mime, fileName: image.path.split('/').pop() };
+          setMedia(updatedMedia);
+        } else {
+          Alert.alert('Size Exceeded', 'Selected image exceeds the size limit of 100 KB.');
         }
-      }
-    });
+      }).catch(error => {
+        console.error('Error picking image:', error);
+      });
+    } else {
+      Alert.alert('Edit Not Supported', 'Editing is only supported for images.');
+    }
   };
 
 
 
 
   const pickLeaderImage = async () => {
-    const options = {
-      mediaType: 'photo',
-    };
-
-    launchImageLibrary(options, (response) => {
-      if (!response.didCancel && !response.errorCode) {
-        const newImage = response.assets[0];
-        setLeaderImage({ uri: newImage.uri });
+    ImagePicker.openPicker({
+      mediaType: 'any',
+      cropping: false, 
+    }).then(item => {
+      if (item.mime.includes('image') && item.size <= 100000) {
+        ImagePicker.openCropper({
+          path: item.path,
+          width: 500,
+          height: 500,
+          cropperCircleOverlay: true,
+          compressImageQuality: 0.8,
+        }).then(croppedImage => {
+          setLeaderImage({ uri: croppedImage.path, type: croppedImage.mime });
+        }).catch(error => {
+          console.error('Error cropping image:', error);
+        });
+      } else if (item.mime.includes('video') && item.size <= 50000000) {
+        setLeaderImage({ uri: item.path, type: item.mime });
+      } else {
+        Alert.alert('Size Exceeded', `Selected ${item.mime.includes('image') ? 'image' : 'video'} exceeds the size limit.`);
       }
+    }).catch(error => {
+      console.error('Error picking media:', error);
     });
   };
 
+  const pickCoverPhoto = async () => {
+    ImagePicker.openPicker({
+      mediaType: 'photo',
+      cropping: false,
+    }).then(image => {
+      if (image.size <= 100000) {
+        ImagePicker.openCropper({
+          path: image.path,
+          width: 1000,
+          height: 1000,
+          compressImageQuality: 0.8,
+        }).then(croppedImage => {
+          setcoverPhoto({ uri: croppedImage.path, type: croppedImage.mime });
+        }).catch(error => {
+          console.error('Error cropping image:', error);
+        });
+      } else {
+        Alert.alert('Size Exceeded', 'Selected image exceeds the size limit of 100 KB.');
+      }
+    }).catch(error => {
+      console.error('Error picking image:', error);
+    });
+  };
 
+  const removeCoverPhoto = () => {
+    setcoverPhoto(null);
+  };
+
+  console.log("these are the valus days,", days)
   return (
-    <KeyboardAvoidingView
+    <ScrollView
       style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
       <ScrollView
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
+
       >
 
 
@@ -441,18 +585,23 @@ export default function Tour() {
                     ) : (
                       <Image source={{ uri: item.uri }} style={styles.image} />
                     )}
-                    <TouchableOpacity
-                      style={styles.editButton}
-                      onPress={() => editMedia(index)}
-                    >
-                      <Text style={styles.editButtonText}>Edit</Text>
-                    </TouchableOpacity>
+                    {
+                      media.length === 4 && (
+                        <TouchableOpacity
+                          style={styles.editButton}
+                          onPress={() => editMedia(index)}
+                        >
+                          <Text style={styles.editButtonText}>Edit</Text>
+                        </TouchableOpacity>
+                      )
+                    }
+
                   </View>
                 ))}
               </Swiper>
 
               {media.length < 4 && (
-                <TouchableOpacity style={styles.addButton} onPress={pickMedia}>
+                <TouchableOpacity style={styles.addButtonSwiper} onPress={pickMedia}>
                   <Text style={styles.addButtonText}>+</Text>
                 </TouchableOpacity>
               )}
@@ -460,6 +609,33 @@ export default function Tour() {
           )}
         </View>
 
+        <View style={styles.coverPhotoContainer}>
+          <Text style={styles.coverPhotoLabel}>Upload Cover Photo</Text>
+          {coverPhoto ? (
+            <View style={styles.coverPhotoWrapper}>
+              <Image
+                source={{ uri: coverPhoto.uri }}
+                style={styles.coverPhoto}
+                resizeMode="cover"
+              />
+              <TouchableOpacity
+                style={styles.removeCoverPhotoButton}
+                onPress={removeCoverPhoto}
+              >
+                <Text style={styles.removeCoverPhotoText}>✕</Text>
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <TouchableOpacity
+              style={styles.coverPhotoPlaceholder}
+              onPress={pickCoverPhoto}
+            >
+              <Text style={styles.coverPhotoPlaceholderText}>Add Cover Photo</Text>
+              <Text style={styles.coverPhotoSizeText}>Image size up to 100 KB</Text>
+
+            </TouchableOpacity>
+          )}
+        </View>
 
         <View style={styles.inputRow}>
           <TextInput
@@ -481,18 +657,22 @@ export default function Tour() {
 
         </View>
 
-        <View>
-          <Text style={styles.titleHeader}>
-            Discription
-          </Text>
+        <View style={styles.descriptionContainer}>
+          <Text style={styles.titleHeader}>Description</Text>
           <TextInput
-            style={styles.textInput}
-            placeholder="Description (Up to 200 words)"
+            style={styles.textInputDescription}
+            placeholder="Description (Up to 250 words)"
             placeholderTextColor="#666"
             multiline
             value={description}
-            onChangeText={setDescription}
+            onChangeText={handleDescriptionChange}
+            maxLength={1200}
+            scrollEnabled
           />
+
+          <Text style={styles.wordCount}>
+            {wordCount} / 250 words
+          </Text>
         </View>
 
 
@@ -579,14 +759,33 @@ export default function Tour() {
             />
           </View>
 
-          <TouchableOpacity onPress={pickLeaderImage}>
+          <TouchableOpacity onPress={pickLeaderImage} style={styles.media}>
             {leaderImage && leaderImage.uri ? (
-              <Image
-                source={{ uri: leaderImage.uri }}
-                style={{ width: 100, height: 100, borderRadius: 50 }}
-              />
+              leaderImage.type?.includes('video') ? (
+
+                <Video
+                  source={{ uri: leaderImage.uri }}
+                  style={styles.media}
+                  resizeMode="contain"
+                  controls={true}
+                  paused={false}
+                />
+              ) : (
+
+                <Image
+                  source={{ uri: leaderImage.uri }}
+                  style={styles.media}
+                />
+              )
             ) : (
-              <Icon name="person-circle-outline" size={100} color="#DE3B40" />
+
+
+              <>
+                <Text>Add  a short video or photo of the tour leader</Text>
+                <Text>Video size upto 50 MB
+                  Image size upto 100 kB </Text>
+              </>
+
             )}
           </TouchableOpacity>
 
@@ -594,100 +793,104 @@ export default function Tour() {
 
           <TextInput
             style={styles.textInput}
-            placeholder="Short description about tour leader (Up to 100 words)"
+            placeholder="Short description about tour leader (Up to 150 words)"
             placeholderTextColor="#666"
             multiline
             value={leaderDescription}
-            onChangeText={setLeaderDescription}
+            onChangeText={handleLeaderDescriptionChange}
           />
+          <Text style={styles.wordCounter}>
+            {leaderDescriptionWordCount}/150 words
+          </Text>
         </View>
 
 
-        <Text style={styles.slotHeader}>Available Days and Time Slots</Text>
+        <Text style={styles.slotHeader}>Day/s on which Tour or walk is conducted</Text>
 
 
-        <FlatList
-          data={days}
-          keyExtractor={(item) => item.id}
-          renderItem={({ item }) => (
-            <View style={styles.dayContainer}>
-             
-              <View style={styles.dayTimeContainer}>
-                <View style={styles.dayRow}>
-                  <Text style={styles.dayName}>{item.day}</Text>
-                  <TouchableOpacity onPress={() => deleteDay(item.id)}>
-                    <DeleteIcon name="delete" size={28} style={styles.icon} />
-                  </TouchableOpacity>
+        <View style={{ flex: 1 }}>
+          <FlatList
+            data={days}
+            keyExtractor={(item) => item.id}
+            renderItem={({ item }) => (
+              <View style={styles.dayContainer}>
+                <View style={styles.dayTimeContainer}>
+                  <View style={styles.dayRow}>
+                    <Text style={styles.dayName}>{item.day}</Text>
+                    <TouchableOpacity onPress={() => deleteDay(item.id)}>
+                      <DeleteIcon name="delete" size={28} style={styles.icon} />
+                    </TouchableOpacity>
+                  </View>
+
+                  <View style={styles.timesRow}>
+                    {item.times.map((time, index) => (
+                      <View key={index} style={styles.timeChip}>
+                        <Text style={styles.timeText}>{time}</Text>
+                        <TouchableOpacity
+                          style={styles.deleteButtonTiny}
+                          onPress={() => deleteTime(item.id, index)}
+                        >
+                          <Text style={styles.deleteButtonText}>-</Text>
+                        </TouchableOpacity>
+                      </View>
+                    ))}
+                  </View>
                 </View>
 
+                {activeDayId === item.id ? (
+                  <View style={styles.timeInputContainer}>
+                    <TextInput
+                      style={styles.timeInput}
+                      placeholder="Enter time (e.g., 7 PM)"
+                      value={timeText}
+                      placeholderTextColor="#666"
+                      onChangeText={setTimeText}
+                    />
+                    <TouchableOpacity
+                      style={styles.addButtonSmall}
+                      onPress={() => addTime(item.id)}
+                    >
+                      <Text style={styles.addButtonText}>+</Text>
+                    </TouchableOpacity>
+                  </View>
+                ) : (
+                  <View style={styles.placeholderContainer}>
+                    <TouchableOpacity
+                      style={styles.addButtonSmall}
+                      onPress={() => setActiveDayId(item.id)}
+                    >
+                      <Text style={styles.addButtonText}>+</Text>
+                    </TouchableOpacity>
+                    <Text style={styles.placeholderText}>Click "+" to add timing</Text>
+                  </View>
+                )}
 
-                
-                <View style={styles.timesRow}>
-                  {item.times.map((time, index) => (
-                    <View key={index} style={styles.timeChip}>
-                      <Text style={styles.timeText}>{time}</Text>
-                      <TouchableOpacity
-                        style={styles.deleteButtonTiny}
-                        onPress={() => deleteTime(item.id, index)}
-                      >
-                        <Text style={styles.deleteButtonText}>-</Text>
-                      </TouchableOpacity>
-                    </View>
-                  ))}
-                </View>
               </View>
-
-              
-              {activeDayId === item.id && (
-                <View style={styles.timeInputContainer}>
-                  <TextInput
-                    style={styles.timeInput}
-                    placeholder="Enter time (e.g., 7 PM)"
-                    value={timeText}
-                    placeholderTextColor="#666"
-                    onChangeText={setTimeText}
-                  />
-                  <TouchableOpacity
-                    style={styles.addButtonSmall}
-                    onPress={() => addTime(item.id)}
-                  >
-                    <Text style={styles.addButtonText}>+</Text>
-                  </TouchableOpacity>
-                </View>
-              )}
-
-
-              {activeDayId !== item.id && (
-                <TouchableOpacity
-                  style={styles.addButtonSmall}
-                  onPress={() => setActiveDayId(item.id)}
-                >
+            )}
+            ListFooterComponent={
+              <View style={styles.footer}>
+                <TextInput
+                  style={styles.input}
+                  placeholder="Add a day (e.g., Monday)"
+                  value={dayText}
+                  placeholderTextColor="#666"
+                  onChangeText={setDayText}
+                />
+                <TouchableOpacity style={styles.addButton} onPress={addDay}>
                   <Text style={styles.addButtonText}>+</Text>
                 </TouchableOpacity>
-              )}
-            </View>
-          )}
-          ListFooterComponent={
-            <View style={styles.footer}>
+              </View>
+            }
+            contentContainerStyle={{ paddingBottom: 5 }}
+            keyboardShouldPersistTaps="handled"
+          />
+        </View>
 
-              <TextInput
-                style={styles.input}
-                placeholder="Add a day (e.g., Monday)"
-                value={dayText}
-                placeholderTextColor="#666"
-                onChangeText={setDayText}
-              />
-              <TouchableOpacity style={styles.addButton} onPress={addDay}>
-                <Text style={styles.addButtonText}>+</Text>
-              </TouchableOpacity>
-            </View>
-          }
-        />
         <View style={styles.screen}>
           <CategoryDropdown onSelect={(id) => setSelectedTourId(id)} />
           <SelectCity onSelect={(id) => setSelectedCityId(id)} />
         </View >
-      
+
 
         <View style={styles.meetingPoint}>
           <Text style={styles.titleHeader}>Enter Contact Number : </Text>
@@ -722,7 +925,21 @@ export default function Tour() {
         </TouchableOpacity>
 
       </ScrollView>
-    </KeyboardAvoidingView>
+
+      <Modal
+        visible={isLoading}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setIsLoading(false)}
+      >
+        <View style={styles.loadingContainer}>
+          <View style={styles.loadingContent}>
+            <ActivityIndicator size="large" color="#DE3B40" />
+            <Text style={styles.loadingText}>Registering...</Text>
+          </View>
+        </View>
+      </Modal>
+    </ScrollView>
   );
 }
 
@@ -732,7 +949,8 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
   },
   scrollContent: {
-    paddingHorizontal: width * 0.05,
+    flexGrow: 1,
+    paddingHorizontal: width * 0.04,
     paddingTop: height * 0.03,
   },
   title: {
@@ -741,10 +959,26 @@ const styles = StyleSheet.create({
     marginBottom: height * 0.02,
   },
   mediaContainer: {
-    height: "20%",
+    height: "12%",
     marginBottom: height * 0.05,
     alignItems: 'center',
 
+  },
+  addButtonSwiper: {
+    position: 'absolute',
+    top: 15,
+    right: 15,
+    backgroundColor: 'rgba(222, 59, 64, 0.7)',
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    elevation: 3,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.2,
+    shadowRadius: 1.5,
   },
   placeholder: {
     width: "100%",
@@ -759,6 +993,7 @@ const styles = StyleSheet.create({
     color: '#666',
   },
   swiper: {
+    flex: 1,
     width: "100%",
     height: "100%",
   },
@@ -789,6 +1024,7 @@ const styles = StyleSheet.create({
     borderRadius: 10,
   },
   inputRow: {
+    marginTop: "10%",
     flexDirection: 'row',
     justifyContent: 'space-between',
     marginBottom: height * 0.01,
@@ -806,13 +1042,15 @@ const styles = StyleSheet.create({
     paddingVertical: 5,
     marginBottom: 10
   },
-  mainTitle: {
-    flex: 0.48,
-    borderBottomWidth: 1,
-    borderColor: '#ccc',
-    paddingVertical: 5,
-    marginBottom: 15
-  },
+  // mainTitle: {
+  //   flex: 0.48,
+  //   borderBottomWidth: 1,
+  //   borderColor: '#ccc',
+  //   paddingVertical: 5,
+  //   justifyContent: 'center',
+  //   alignItems: 'flex-start',
+  //   marginBottom: 15
+  // },
   textInput: {
     flex: 1,
     borderBottomWidth: 1,
@@ -820,6 +1058,12 @@ const styles = StyleSheet.create({
     padding: 8,
     borderRadius: 4,
     fontSize: 14,
+  },
+  wordCounter: {
+    marginTop: 8,
+    fontSize: 14,
+    color: "#888",
+    textAlign: "right",
   },
   leaderContainer: {
     alignItems: 'center',
@@ -862,7 +1106,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderRadius: 10,
     marginTop: 20,
-    marginBottom: 15
+    marginBottom: 100
   },
   submitButtonText: {
     color: '#fff',
@@ -887,22 +1131,22 @@ const styles = StyleSheet.create({
     borderRadius: 4,
     marginHorizontal: 5,
   },
-  addButton: {
-    position: 'absolute',
-    bottom: 15,
-    right: 15,
-    backgroundColor: 'rgba(222, 59, 64, 0.7)',
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
-    elevation: 3,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.2,
-    shadowRadius: 1.5,
-  },
+  // addButton: {
+  //   position: 'absolute',
+  //   bottom: 15,
+  //   right: 15,
+  //   backgroundColor: 'rgba(222, 59, 64, 0.7)',
+  //   width: 40,
+  //   height: 40,
+  //   borderRadius: 20,
+  //   justifyContent: 'center',
+  //   alignItems: 'center',
+  //   elevation: 3,
+  //   shadowColor: '#000',
+  //   shadowOffset: { width: 0, height: 1 },
+  //   shadowOpacity: 0.2,
+  //   shadowRadius: 1.5,
+  // },
   addButtonText: {
     color: '#fff',
     fontSize: 20,
@@ -949,8 +1193,9 @@ const styles = StyleSheet.create({
     gap: 10
   },
   dayContainer: {
+
     padding: 12,
-    marginBottom: 16,
+    marginBottom: 50,
     backgroundColor: '#fff',
     borderRadius: 8,
     shadowColor: '#000',
@@ -960,10 +1205,10 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   dayRow: {
-    flexDirection: 'row',        // Arrange children in a row
-    alignItems: 'center',        // Vertically align items
-    justifyContent: 'space-between', // Push elements to opposite ends
-    marginBottom: 8,             // Add some spacing below the row
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 8,
   },
   dayInputContainer: {
     flexDirection: 'row',
@@ -971,32 +1216,37 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   dayInput: {
-    height: 40, // Height of the input field
-    borderColor: '#ccc', // Border color for input
-    borderWidth: 1,     // Border width
-    borderRadius: 5,    // Rounded corners
-    paddingHorizontal: 10, // Padding inside the input field
-    marginBottom: 10,    // Space below the input field
+    height: 40,
+    borderColor: '#ccc',
+    borderWidth: 1,
+    borderRadius: 5,
+    paddingHorizontal: 10,
+    marginBottom: 10,
   },
   timeSlotContainer: {
-    flexDirection: 'row', // Time slots in a row
-    marginBottom: 10,     // Space between time slots
+    flexDirection: 'row',
+    marginBottom: 10,
   },
   timeInput: {
-    height: 40,          // Height of the input field
-    borderColor: '#ccc', // Border color
-    borderWidth: 1,     // Border width
-    borderRadius: 5,    // Rounded corners
-    flex: 1,             // Each input takes equal space
-    marginRight: 10,     // Space between the two time input fields
-    paddingHorizontal: 10, // Padding inside the input field
+    height: 40,
+    borderColor: '#ccc',
+    borderWidth: 1,
+    borderRadius: 5,
+    flex: 1,
+    marginRight: 10,
+    paddingHorizontal: 10,
   },
 
   mainTitle: {
-    fontSize: 20,
+    fontSize: 18,
+    flex: width,
+    borderBottomWidth: 1,
+    borderColor: '#ccc',
+    paddingVertical: 5,
     fontWeight: 'bold',
+    fontFamily: 'Poppins',
     marginBottom: 16,
-    textAlign: 'center',
+    textAlign: 'flex-start',
   },
   rowContainer: {
     flexDirection: 'row',
@@ -1007,10 +1257,10 @@ const styles = StyleSheet.create({
     marginHorizontal: 8,
   },
   leaderDetails: {
-    flexDirection: 'row', // Aligns "Tour Leader" and input in a row
-    alignItems: 'center', // Centers vertically
-    width: '100%', // Ensures the row takes full width
-    marginBottom: 10, // Adds spacing below this row
+    flexDirection: 'row',
+    alignItems: 'center',
+    width: '100%',
+    marginBottom: 10,
   },
   title: {
     fontSize: 16,
@@ -1036,6 +1286,24 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  footer: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 10,
+
+
+    marginTop: 10,
+  },
+  input: {
+    flex: 1,
+    height: 40,
+    borderColor: '#ccc',
+    borderWidth: 1,
+    borderRadius: 5,
+    paddingHorizontal: 10,
+    marginRight: 10,
+  },
   addButtonText: {
     color: '#fff',
     fontSize: 20,
@@ -1051,9 +1319,9 @@ const styles = StyleSheet.create({
   },
 
   dayName: {
-    fontSize: 16,                // Text size for the day name
-    fontWeight: 'bold',          // Make the day name bold
-    color: '#333',               // Day name text color
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#333',
   },
   timeInput: {
     flex: 1,
@@ -1094,6 +1362,9 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#333',
   },
+  addButtonDay: {
+
+  },
   deleteButtonSmall: {
     backgroundColor: '#FF5E5E',
     width: 30,
@@ -1130,11 +1401,18 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
 
   },
+  textInputDescription: {
+    width: '100%',
+    maxHeight: 200,
+    padding: 10,
+    fontSize: 14,
+    color: '#333',
+  },
   editButton: {
     position: 'absolute',
-    bottom: 10,
+    top: 10,
     right: 10,
-    backgroundColor: '#ff9800',
+    backgroundColor: 'rgba(222, 59, 64, 0.7)',
     paddingHorizontal: 10,
     paddingVertical: 5,
     borderRadius: 5,
@@ -1144,5 +1422,107 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: 'bold',
   },
+  coverPhotoContainer: {
+    height: "10%",
+    marginBottom: height * 0.10,
+    alignItems: 'center',
+  },
+  coverPhotoLabel: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginBottom: 10,
+  },
+  coverPhotoSizeText: {
+    fontSize: 14,
+    color: '#888',
+    marginBottom: 10,
+  },
+  coverPhotoWrapper: {
+    position: 'relative',
+    width: '100%',
+    aspectRatio: 16 / 9,
+    borderRadius: 10,
+    overflow: 'hidden',
+  },
+  coverPhoto: {
+    width: "100%",
+    height: "100%",
+    borderRadius: 10,
+  },
+  coverPhotoPlaceholder: {
+    width: "100%",
+    height: "100%",
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#ccc',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  coverPhotoPlaceholderText: {
+    color: '#888',
+    textAlign: 'center',
+  },
+  removeCoverPhotoButton: {
+    position: 'absolute',
+    top: 15,
+    right: 15,
+    backgroundColor: 'rgba(222, 59, 64, 0.7)',
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    elevation: 3,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.2,
+    shadowRadius: 1.5,
+  },
+  removeCoverPhotoText: {
+    color: '#fff',
+    fontWeight: 'bold',
+  },
 
+  media: {
+    width: width * 0.9,
+    height: height * 0.25,
+    borderRadius: 5,
+    textAlign: 'center',
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#ccc',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+  },
+  loadingContent: {
+    backgroundColor: 'white',
+    padding: 30,
+    borderRadius: 15,
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: 250,
+    height: 200,
+    shadowColor: '#000',
+    shadowOpacity: 0.1,
+    shadowRadius: 10,
+    shadowOffset: {
+      width: 0,
+      height: 5,
+    },
+    elevation: 5,
+
+  },
+  loadingText: {
+    marginTop: 20,
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#DE3B40',
+  },
 });

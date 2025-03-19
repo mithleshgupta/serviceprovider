@@ -1,20 +1,29 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
-import { useNavigation, useRoute } from '@react-navigation/native';
+import { View, Text, StyleSheet, TouchableOpacity, Image } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
 
 export default function Confirmation() {
     const navigation = useNavigation();
-    const route = useRoute();
 
     function onClick() {
-        navigation.navigate('Registration'); 
+        navigation.navigate('Registration');
     }
 
     return (
         <View style={styles.container}>
-            <Text style={styles.confirmation}>Confirmation</Text>
+            <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
+                <Text style={styles.backButtonText}>←</Text>
+            </TouchableOpacity>
+            <Image
+                source={require("../assets/Success.png")}
+                style={styles.image}
+            />
+            <Text style={styles.title}>Congratulations!!</Text>
+            <Text style={styles.subtitle}>
+                Your tour/walk has been successfully registered on STORYE
+            </Text>
             <TouchableOpacity style={styles.button} onPress={onClick}>
-                <Text style={styles.buttonText}>Add Another Experimental Tour/Walk</Text>
+                <Text style={styles.buttonText}>Add Another Experiential Tour/Walk</Text>
             </TouchableOpacity>
         </View>
     );
@@ -25,27 +34,47 @@ const styles = StyleSheet.create({
         flex: 1,
         justifyContent: 'center',
         alignItems: 'center',
-        backgroundColor: '#fff',
+        backgroundColor: '#DE3B40',
+        paddingHorizontal: 20,
     },
-    confirmation: {
-        fontSize: 32,
-        fontWeight: '700',
-        color: '#171A1F',
+    backButton: {
+        position: 'absolute',
+        top: 50,
+        left: 20,
+    },
+    backButtonText: {
+        fontSize: 24,
+        color: '#FFFFFF',
+    },
+    image: {
+        width:200,
+        height: 200,
         marginBottom: 20,
     },
+    title: {
+        fontSize: 24,
+        fontWeight: '700',
+        color: '#FFFFFF',
+        marginBottom: 10,
+    },
+    subtitle: {
+        fontSize: 16,
+        fontWeight: '400',
+        color: '#FFFFFF',
+        textAlign: 'center',
+        marginBottom: 30,
+    },
     button: {
-        width: '80%',
-        height: 44,
+        width: '90%',
+        height: 50,
         justifyContent: 'center',
         alignItems: 'center',
-        borderRadius: 12,
-        borderWidth: 1,
-        borderColor: '#DE3B40',
-        backgroundColor: 'transparent',
+        borderRadius: 8,
+        backgroundColor: '#FFFFFF',
     },
     buttonText: {
         fontSize: 16,
-        fontWeight: '400',
+        fontWeight: '500',
         color: '#DE3B40',
     },
 });
