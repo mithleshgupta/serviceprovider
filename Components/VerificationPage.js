@@ -1,15 +1,13 @@
 import React from 'react';
-import { View, Text, StyleSheet, Dimensions } from 'react-native';
+import { View, Text, StyleSheet, Dimensions, Image } from 'react-native';
 
 export default function Verification() {
-    const { height } = Dimensions.get('window');
-
     return (
         <View style={styles.container}>
-            <View style={[styles.mainHeadingContainer, { marginTop: -height * 0.1 }]}>
+            <Image source={require('./../assets/Verification.png')} style={styles.image} />
+            <View style={styles.mainHeadingContainer}>
+                <Text style={styles.mainHeading}>Verification Under Process</Text>
                
-                <Text style={styles.mainHeading}>Verification Under</Text>
-                <Text style={styles.mainHeading}>Process</Text>
             </View>
             <Text style={styles.subText}>
                 We will notify you once your profile has been verified
@@ -21,28 +19,38 @@ export default function Verification() {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        justifyContent: 'center',
         alignItems: 'center',
-        backgroundColor: '#fff',
+        backgroundColor: '#DE3B40',
         paddingHorizontal: 20,
+        paddingTop: 60,
+    },
+    image: {
+        width: 180,
+        height: 180,
+        resizeMode: 'contain',
+        marginTop: 60,
+    
     },
     mainHeadingContainer: {
-        marginBottom: 120, 
+        marginBottom: 2,
     },
     mainHeading: {
         fontFamily: 'Poppins',
-        fontSize: 28,
+        fontSize: 34,
         fontWeight: '700',
-        color: '#DE3B40',
+        color: '#FFF',
         textAlign: 'center',
-        lineHeight: 36,
+        alignSelf:"center",
+        
+        marginTop:50
     },
     subText: {
         fontFamily: 'Poppins',
-        fontSize: 16,
+        fontSize: 20,
         fontWeight: '400',
-        color: '#7A7A7A',
+        color: '#FFF',
         textAlign: 'center',
         lineHeight: 24,
+        marginTop: 100,
     },
 });

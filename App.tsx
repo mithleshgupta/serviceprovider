@@ -7,6 +7,7 @@ import OTP from './Components/OTP';
 import Registration from './Components/Registration';
 import Tour from './Components/Tour';
 import Confirmation from './Components/Confirmation';
+import Verification from './Components/VerificationPage';
 
 const Stack = createStackNavigator();
 
@@ -17,6 +18,7 @@ const App = () => {
         <Stack.Screen name="Splash" component={Splash} />
         <Stack.Screen name="Welcome" component={Welcome} />
         <Stack.Screen name="OTP" component={OTP} />
+        <Stack.Screen name="verification" component={Verification} />
         <Stack.Screen name="Registration" component={Registration} />
         <Stack.Screen name="Tour" component={Tour} />
         <Stack.Screen name="Confirmation" component={Confirmation} />

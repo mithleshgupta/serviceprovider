@@ -11,21 +11,30 @@ export default function Splash() {
             try {
                 const token = await AsyncStorage.getItem('token');
                 if (token) {
-                    navigation.navigate('Registration');
+                    navigation.reset({
+                        index: 0,
+                        routes: [{ name: 'Registration' }],
+                    });
                 } else {
-                    navigation.navigate('Welcome');
+                    navigation.reset({
+                        index: 0,
+                        routes: [{ name: 'Welcome' }],
+                    });
                 }
             } catch (error) {
                 console.error('Error checking token:', error);
-                navigation.navigate('Welcome');
+                navigation.reset({
+                    index: 0,
+                    routes: [{ name: 'Welcome' }], // Reset stack to Welcome on error
+                });
             }
         };
 
         const timer = setTimeout(() => {
             checkTokenAndNavigate();
-        }, 2000);
+        }, 2000); // Delay for splash screen
 
-        return () => clearTimeout(timer);
+        return () => clearTimeout(timer); // Cleanup timer
     }, [navigation]);
 
     return (
@@ -38,13 +47,13 @@ export default function Splash() {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#E3292C',
+        backgroundColor: '#E3292C', // Retain the red background
         justifyContent: 'center',
         alignItems: 'center',
     },
     image: {
         width: 400,
-        height: 40000,
-        resizeMode: 'contain',
+        height: 400, // Corrected height
+        resizeMode: 'contain', // Ensure the image scales properly
     },
 });

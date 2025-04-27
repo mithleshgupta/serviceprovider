@@ -8,9 +8,12 @@ import {
     Platform,
     TouchableOpacity,
     Dimensions,
+    Modal,
+    ActivityIndicator,
 } from "react-native";
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useNavigation, useRoute } from "@react-navigation/native";
+import { jwtDecode } from "jwt-decode";
 
 const { width, height } = Dimensions.get("window");
 
@@ -19,8 +22,9 @@ const OTP = () => {
     const navigation = useNavigation();
 
     const [otp, setOtp] = useState(["", "", "", ""]);
+    const [isLoading, setIsLoading] = useState(false); 
     const inputRefs = useRef([]);
-    const { email, userType, action, phone } = route.params;
+    const { email, userType, action, phone, gender, dob, instagram, city } = route.params;
 
     const handleChange = (value, index) => {
         const updatedOtp = [...otp];
@@ -44,11 +48,12 @@ const OTP = () => {
     };
 
     const handleVerifyOtp = async () => {
+        setIsLoading(true); 
         try {
             const endpoint =
                 action === "signup"
-                    ? `https://latestservice-production.up.railway.app/api/auth/verify-signup-otp`
-                    : `https://latestservice-production.up.railway.app/api/auth/login-verify`;
+                    ? 'http://65.0.167.149:8086/api/auth/verify-signup-otp'
+                    : 'http://65.0.167.149:8086/api/auth/login-verify';
 
             const response = await fetch(endpoint, {
                 method: "POST",
@@ -58,19 +63,52 @@ const OTP = () => {
                     otp: otp.join(""),
                     userType,
                     phone,
+                    gender,
+                    dob,
+                    instagram,
+                    city,
                 }),
             });
 
             const result = await response.json();
             if (response.ok) {
                 await AsyncStorage.setItem("token", result.token);
-                alert(result.message);
-                navigation.navigate("Registration");
+
+                const decodedToken = jwtDecode(result.token);
+                console.log("Decoded Token:", decodedToken);
+                const userId = decodedToken.userId;
+
+                checkUserVerification(userId);
             } else {
                 alert(result.message);
             }
         } catch (error) {
+            console.error("Error during OTP verification:", error);
             alert("Something went wrong.");
+        } finally {
+            setIsLoading(false); 
+        }
+    };
+
+    const checkUserVerification = async (userId) => {
+        try {
+            const response = await fetch(`http://65.0.167.149:8086/api/auth/check-verification/${userId}`, {
+                method: "GET",
+                headers: { "Content-Type": "application/json" },
+            });
+
+            const result = await response.json();
+            if (response.ok) {
+                if (result.is_verified) {
+                    navigation.navigate("Registration");
+                } else {
+                    navigation.navigate("verification");
+                }
+            } else {
+                alert("Failed to check verification status.");
+            }
+        } catch (error) {
+            alert("Error checking verification.");
         }
     };
 
@@ -101,6 +139,20 @@ const OTP = () => {
             <TouchableOpacity style={styles.button} onPress={handleVerifyOtp}>
                 <Text style={styles.buttonText}>Verify OTP</Text>
             </TouchableOpacity>
+
+            <Modal
+                transparent={true}
+                animationType="fade"
+                visible={isLoading}
+                onRequestClose={() => {}}
+            >
+                <View style={styles.modalContainer}>
+                    <View style={styles.modalContent}>
+                        <ActivityIndicator size="large" color="#DE3B40" />
+                        <Text style={styles.modalText}>Verifying OTP...</Text>
+                    </View>
+                </View>
+            </Modal>
         </KeyboardAvoidingView>
     );
 };
@@ -156,5 +208,24 @@ const styles = StyleSheet.create({
         color: "#FFFFFF",
         fontSize: width * 0.045,
         fontWeight: "bold",
+    },
+    modalContainer: {
+        flex: 1,
+        justifyContent: "center",
+        alignItems: "center",
+        backgroundColor: "rgba(0, 0, 0, 0.5)",
+    },
+    modalContent: {
+        width: "80%",
+        padding: 20,
+        backgroundColor: "#FFF",
+        borderRadius: 10,
+        alignItems: "center",
+    },
+    modalText: {
+        marginTop: 10,
+        fontSize: width * 0.045,
+        color: "#171A1F",
+        textAlign: "center",
     },
 });

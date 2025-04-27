@@ -81,7 +81,10 @@ export default function Tour() {
       setIncludeText('');
     }
   };
-
+  const removeMedia = (index) => {
+    const updatedMedia = media.filter((_, i) => i !== index);
+    setMedia(updatedMedia);
+  };
   const handleDescriptionChange = (text) => {
 
     const wordCount = text.split(/\s+/).filter(Boolean).length;
@@ -168,7 +171,7 @@ export default function Tour() {
 
         try {
           const response = await fetch(
-            `https://latestservice-production.up.railway.app/api/tours/tours/${tourId}`,
+            `http://65.0.167.149:8086/api/tours/tours/${tourId}`,
             {
               method: 'GET',
               headers: {
@@ -214,11 +217,27 @@ export default function Tour() {
 
 
             if (tourData.tour_days) {
-              const parsedDays = tourData.tour_days.map((day) => ({
-                id: Math.random().toString(36).substring(7),
-                day: day.day.trim(),
-                times: day.times.map((time) => time.trim()),
+            
+              const flattenedDays = tourData.tour_days.flat().reduce((uniqueDays, currentDay) => {
+                const isDuplicate = uniqueDays.some(
+                  (day) => day.day === currentDay.day && JSON.stringify(day.times) === JSON.stringify(currentDay.times)
+                );
+                if (!isDuplicate) {
+                  uniqueDays.push(currentDay);
+                }
+                return uniqueDays;
+              }, []);
+
+             
+              const parsedDays = flattenedDays.map((day) => ({
+                id: Math.random().toString(36).substring(7), 
+                day: day.day?.trim() || '', 
+                times: Array.isArray(day.times)
+                  ? day.times.map((time) => time.trim())
+                  : [],
               }));
+
+             
               setDays(parsedDays);
             }
 
@@ -267,7 +286,7 @@ export default function Tour() {
 
 
 
-  const API_BASE_URL = 'https://latestservice-production.up.railway.app/api/tours';
+  const API_BASE_URL = 'http://65.0.167.149:8086/api/tours';
 
 
   const prepareFormData = (formattedData, leaderImage, media, coverPhoto, days, meetingPoint, tourIncludes, tourExcludes) => {
@@ -335,13 +354,16 @@ export default function Tour() {
 
 
     if (days && days.length > 0) {
-      days.forEach(day => {
-        formData.append('days', JSON.stringify({
-          day: day.day,
-          times: day.times,
-        }));
-      });
+      const sanitizedDays = days.map(({ id, ...rest }) => ({
+        day: rest.day.trim(),
+        times: Array.isArray(rest.times) ? rest.times.map((time) => time.trim()) : [], 
+      }));
+
+      console.log("Sanitized days data being sent to backend:", sanitizedDays);
+
+      formData.append('days', JSON.stringify(sanitizedDays));
     }
+
 
     return formData;
   };
@@ -484,7 +506,7 @@ export default function Tour() {
   const pickLeaderImage = async () => {
     ImagePicker.openPicker({
       mediaType: 'any',
-      cropping: false, 
+      cropping: false,
     }).then(item => {
       if (item.mime.includes('image') && item.size <= 100000) {
         ImagePicker.openCropper({
@@ -536,395 +558,397 @@ export default function Tour() {
     setcoverPhoto(null);
   };
 
-  console.log("these are the valus days,", days)
   return (
-    <ScrollView
-      style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-    >
-      <ScrollView
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
+    <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
 
-      >
+      <View style={{ flex: 1 }}>
+        <ScrollView
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+
+        >
+          <TextInput
+            style={styles.mainTitle}
+            placeholder="Enter tour title"
+            placeholderTextColor="#666"
+            value={title}
+            onChangeText={(text) => setTitle(text)}
+          />
 
 
-
-        <TextInput style={styles.mainTitle} placeholder='Enter tour title' placeholderTextColor="#666" value={title} onChangeText={setTitle} />
-
-
-        <View style={styles.mediaContainer}>
-          {media.length === 0 ? (
-            <TouchableOpacity style={styles.placeholder} onPress={pickMedia}>
-              <Text style={styles.placeholderText}>
-                Add Videos and Photos of Tour/Walk (Maximum 4){'\n'}
-                Video size up to 50 MB (Max 1){'\n'}
-                Image size up to 100 KB (Max 3)
-              </Text>
-            </TouchableOpacity>
-          ) : (
-            <View style={styles.container}>
-              <Swiper
-                style={styles.swiper}
-                showsPagination
-                paginationStyle={{ bottom: 10 }}
-                dotStyle={styles.dot}
-                activeDotStyle={styles.activeDot}
-                loop={false}
-                key={media.length}
-              >
-                {media.map((item, index) => (
-                  <View key={`media-${index}`} style={styles.slide}>
-                    {item.type?.includes('video') ? (
-                      <Video
-                        source={{ uri: item.uri }}
-                        style={styles.image}
-                        resizeMode="contain"
-                        paused
-                      />
-                    ) : (
-                      <Image source={{ uri: item.uri }} style={styles.image} />
-                    )}
-                    {
-                      media.length === 4 && (
-                        <TouchableOpacity
-                          style={styles.editButton}
-                          onPress={() => editMedia(index)}
-                        >
-                          <Text style={styles.editButtonText}>Edit</Text>
-                        </TouchableOpacity>
-                      )
-                    }
-
-                  </View>
-                ))}
-              </Swiper>
-
-              {media.length < 4 && (
-                <TouchableOpacity style={styles.addButtonSwiper} onPress={pickMedia}>
-                  <Text style={styles.addButtonText}>+</Text>
-                </TouchableOpacity>
-              )}
-            </View>
-          )}
-        </View>
-
-        <View style={styles.coverPhotoContainer}>
-          <Text style={styles.coverPhotoLabel}>Upload Cover Photo</Text>
-          {coverPhoto ? (
-            <View style={styles.coverPhotoWrapper}>
-              <Image
-                source={{ uri: coverPhoto.uri }}
-                style={styles.coverPhoto}
-                resizeMode="cover"
-              />
-              <TouchableOpacity
-                style={styles.removeCoverPhotoButton}
-                onPress={removeCoverPhoto}
-              >
-                <Text style={styles.removeCoverPhotoText}>✕</Text>
+          <View style={styles.mediaContainer}>
+            {media.length === 0 ? (
+              <TouchableOpacity style={styles.placeholder} onPress={pickMedia}>
+                <Text style={styles.placeholderText}>
+                  Add Videos and Photos of Tour/Walk (Maximum 4){'\n'}
+                  Video size up to 50 MB (Max 1){'\n'}
+                  Image size up to 100 KB (Max 3)
+                </Text>
               </TouchableOpacity>
-            </View>
-          ) : (
-            <TouchableOpacity
-              style={styles.coverPhotoPlaceholder}
-              onPress={pickCoverPhoto}
-            >
-              <Text style={styles.coverPhotoPlaceholderText}>Add Cover Photo</Text>
-              <Text style={styles.coverPhotoSizeText}>Image size up to 100 KB</Text>
-
-            </TouchableOpacity>
-          )}
-        </View>
-
-        <View style={styles.inputRow}>
-          <TextInput
-            style={styles.halfInput}
-            placeholder="Enter Language/s in which tour/walk is offered"
-            placeholderTextColor="#666"
-            value={languages}
-            onChangeText={setLanguages}
-          />
-          <TextInput
-            style={styles.halfInput}
-            multiline
-            placeholder="Enter Price of Tour/Walk per person in INR"
-            placeholderTextColor="#666"
-            value={price.toString()}
-            keyboardType="numeric"
-            onChangeText={(text) => setPrice(text.replace(/[^0-9.]/g, ''))}
-          />
-
-        </View>
-
-        <View style={styles.descriptionContainer}>
-          <Text style={styles.titleHeader}>Description</Text>
-          <TextInput
-            style={styles.textInputDescription}
-            placeholder="Description (Up to 250 words)"
-            placeholderTextColor="#666"
-            multiline
-            value={description}
-            onChangeText={handleDescriptionChange}
-            maxLength={1200}
-            scrollEnabled
-          />
-
-          <Text style={styles.wordCount}>
-            {wordCount} / 250 words
-          </Text>
-        </View>
-
-
-
-        <View style={styles.meetingPoint}>
-          <Text style={styles.titleHeader}>Meeting Point : </Text>
-          <TextInput style={styles.underInput} placeholder='Meeting Point' placeholderTextColor="#666" value={meetingPoint} onChangeText={setMeetingPoint} />
-        </View>
-
-        <View style={styles.duration}>
-          <Text style={styles.titleHeader}>Duration of Tour/Walk:</Text>
-          <TextInput
-            style={styles.underInput}
-            placeholder="Duration of Tour/Walk"
-            placeholderTextColor="#666"
-            value={duration}
-            onChangeText={setDuration}
-          />
-        </View>
-
-
-        <View style={styles.rowContainer}>
-
-          <View style={styles.section}>
-            <Text style={styles.title}>Includes</Text>
-            <FlatList
-              data={tourIncludes}
-              keyExtractor={(item, index) => index.toString()}
-              renderItem={({ item }) => (
-                <Text style={styles.bulletPoint}>• {item}</Text>
-              )}
-            />
-            <View style={styles.inputRow}>
-              <TextInput
-                style={styles.input}
-                placeholder="Enter an include"
-                placeholderTextColor="#666"
-                value={includeText}
-                onChangeText={setIncludeText}
-              />
-              <TouchableOpacity style={styles.addButton} onPress={addInclude}>
-                <Text style={styles.addButtonText}>+</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-
-
-          <View style={styles.section}>
-            <Text style={styles.title}>Excludes</Text>
-            <FlatList
-              data={tourExcludes}
-              keyExtractor={(item, index) => index.toString()}
-              renderItem={({ item }) => (
-                <Text style={styles.bulletPoint}>• {item}</Text>
-              )}
-            />
-            <View style={styles.inputRow}>
-              <TextInput
-                style={styles.input}
-                placeholderTextColor="#666"
-                placeholder="Enter an exclude"
-                value={excludeText}
-                onChangeText={setExcludeText}
-              />
-              <TouchableOpacity style={styles.addButton} onPress={addExclude}>
-                <Text style={styles.addButtonText}>+</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-
-
-
-        <View style={styles.leaderContainer}>
-
-          <View style={styles.leaderDetails}>
-            <Text style={styles.title}>Tour leader:</Text>
-            <TextInput
-              style={styles.textInput}
-              placeholder="Tour Leader Name"
-              placeholderTextColor="#666"
-              value={leaderName}
-              onChangeText={setLeaderName}
-            />
-          </View>
-
-          <TouchableOpacity onPress={pickLeaderImage} style={styles.media}>
-            {leaderImage && leaderImage.uri ? (
-              leaderImage.type?.includes('video') ? (
-
-                <Video
-                  source={{ uri: leaderImage.uri }}
-                  style={styles.media}
-                  resizeMode="contain"
-                  controls={true}
-                  paused={false}
-                />
-              ) : (
-
-                <Image
-                  source={{ uri: leaderImage.uri }}
-                  style={styles.media}
-                />
-              )
             ) : (
+              <View style={styles.container}>
+                <Swiper
+                  style={styles.swiper}
+                  showsPagination
+                  paginationStyle={{ bottom: 10 }}
+                  dotStyle={styles.dot}
+                  activeDotStyle={styles.activeDot}
+                  loop={false}
+                  key={media.length}
+                >
+                  {media.map((item, index) => (
+                    <View key={`media-${index}`} style={styles.slide}>
+                      {item.type?.includes('video') ? (
+                        <Video
+                          source={{ uri: item.uri }}
+                          style={styles.image}
+                          resizeMode="contain"
+                          controls={true}
+                          paused={true}
+                        />
+                      ) : (
+                        <Image source={{ uri: item.uri }} style={styles.image} />
+                      )}
 
 
-              <>
-                <Text>Add  a short video or photo of the tour leader</Text>
-                <Text>Video size upto 50 MB
-                  Image size upto 100 kB </Text>
-              </>
+                      <TouchableOpacity
+                        style={styles.removeButton}
+                        onPress={() => removeMedia(index)}
+                      >
+                        <Text style={styles.removeButtonText}>✕</Text>
+                      </TouchableOpacity>
+                    </View>
+                  ))}
+                </Swiper>
 
-            )}
-          </TouchableOpacity>
-
-
-
-          <TextInput
-            style={styles.textInput}
-            placeholder="Short description about tour leader (Up to 150 words)"
-            placeholderTextColor="#666"
-            multiline
-            value={leaderDescription}
-            onChangeText={handleLeaderDescriptionChange}
-          />
-          <Text style={styles.wordCounter}>
-            {leaderDescriptionWordCount}/150 words
-          </Text>
-        </View>
-
-
-        <Text style={styles.slotHeader}>Day/s on which Tour or walk is conducted</Text>
-
-
-        <View style={{ flex: 1 }}>
-          <FlatList
-            data={days}
-            keyExtractor={(item) => item.id}
-            renderItem={({ item }) => (
-              <View style={styles.dayContainer}>
-                <View style={styles.dayTimeContainer}>
-                  <View style={styles.dayRow}>
-                    <Text style={styles.dayName}>{item.day}</Text>
-                    <TouchableOpacity onPress={() => deleteDay(item.id)}>
-                      <DeleteIcon name="delete" size={28} style={styles.icon} />
-                    </TouchableOpacity>
-                  </View>
-
-                  <View style={styles.timesRow}>
-                    {item.times.map((time, index) => (
-                      <View key={index} style={styles.timeChip}>
-                        <Text style={styles.timeText}>{time}</Text>
-                        <TouchableOpacity
-                          style={styles.deleteButtonTiny}
-                          onPress={() => deleteTime(item.id, index)}
-                        >
-                          <Text style={styles.deleteButtonText}>-</Text>
-                        </TouchableOpacity>
-                      </View>
-                    ))}
-                  </View>
-                </View>
-
-                {activeDayId === item.id ? (
-                  <View style={styles.timeInputContainer}>
-                    <TextInput
-                      style={styles.timeInput}
-                      placeholder="Enter time (e.g., 7 PM)"
-                      value={timeText}
-                      placeholderTextColor="#666"
-                      onChangeText={setTimeText}
-                    />
-                    <TouchableOpacity
-                      style={styles.addButtonSmall}
-                      onPress={() => addTime(item.id)}
-                    >
-                      <Text style={styles.addButtonText}>+</Text>
-                    </TouchableOpacity>
-                  </View>
-                ) : (
-                  <View style={styles.placeholderContainer}>
-                    <TouchableOpacity
-                      style={styles.addButtonSmall}
-                      onPress={() => setActiveDayId(item.id)}
-                    >
-                      <Text style={styles.addButtonText}>+</Text>
-                    </TouchableOpacity>
-                    <Text style={styles.placeholderText}>Click "+" to add timing</Text>
-                  </View>
+                {media.length < 4 && (
+                  <TouchableOpacity style={styles.addButtonSwiper} onPress={pickMedia}>
+                    <Text style={styles.addButtonText}>+</Text>
+                  </TouchableOpacity>
                 )}
-
               </View>
             )}
-            ListFooterComponent={
-              <View style={styles.footer}>
+          </View>
+
+          <View style={styles.coverPhotoContainer}>
+            <Text style={styles.coverPhotoLabel}>Upload Cover Photo</Text>
+            {coverPhoto ? (
+              <View style={styles.coverPhotoWrapper}>
+                <Image
+                  source={{ uri: coverPhoto.uri }}
+                  style={styles.coverPhoto}
+                  resizeMode="cover"
+                />
+                <TouchableOpacity
+                  style={styles.removeCoverPhotoButton}
+                  onPress={removeCoverPhoto}
+                >
+                  <Text style={styles.removeCoverPhotoText}>✕</Text>
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <TouchableOpacity
+                style={styles.coverPhotoPlaceholder}
+                onPress={pickCoverPhoto}
+              >
+                <Text style={styles.coverPhotoPlaceholderText}>Add Cover Photo</Text>
+                <Text style={styles.coverPhotoSizeText}>Image size up to 100 KB</Text>
+
+              </TouchableOpacity>
+            )}
+          </View>
+
+          <View style={styles.inputRow}>
+            <TextInput
+              style={styles.halfInput}
+              placeholder="Enter Language/s in which tour/walk is offered"
+              placeholderTextColor="#666"
+              value={languages}
+              onChangeText={setLanguages}
+            />
+            <TextInput
+              style={styles.halfInput}
+              multiline
+              placeholder="Enter Price of Tour/Walk per person in INR"
+              placeholderTextColor="#666"
+              value={price.toString()}
+              keyboardType="numeric"
+              onChangeText={(text) => setPrice(text.replace(/[^0-9.]/g, ''))}
+            />
+
+          </View>
+
+          <View style={styles.descriptionContainer}>
+            <Text style={styles.titleHeader}>Description</Text>
+            <TextInput
+              style={styles.textInputDescription}
+              placeholder="Description (Up to 250 words)"
+              placeholderTextColor="#666"
+              multiline
+              value={description}
+              onChangeText={handleDescriptionChange}
+              maxLength={1200}
+              scrollEnabled
+            />
+
+            <Text style={styles.wordCount}>
+              {wordCount} / 250 words
+            </Text>
+          </View>
+
+
+
+          <View style={styles.meetingPoint}>
+            <Text style={styles.titleHeader}>Meeting Point : </Text>
+            <TextInput style={styles.underInput} placeholder='Meeting Point' placeholderTextColor="#666" value={meetingPoint} onChangeText={setMeetingPoint} />
+          </View>
+
+          <View style={styles.duration}>
+            <Text style={styles.titleHeader}>Duration of Tour/Walk:</Text>
+            <TextInput
+              style={styles.underInput}
+              placeholder="Duration of Tour/Walk"
+              placeholderTextColor="#666"
+              value={duration}
+              onChangeText={setDuration}
+            />
+          </View>
+
+
+          <View style={styles.rowContainer}>
+
+            <View style={styles.section}>
+              <Text style={styles.title}>Includes</Text>
+              <FlatList
+                data={tourIncludes}
+                keyExtractor={(item, index) => index.toString()}
+                renderItem={({ item }) => (
+                  <Text style={styles.bulletPoint}>• {item}</Text>
+                )}
+              />
+              <View style={styles.inputRow}>
                 <TextInput
                   style={styles.input}
-                  placeholder="Add a day (e.g., Monday)"
-                  value={dayText}
+                  placeholder="Enter an include"
                   placeholderTextColor="#666"
-                  onChangeText={setDayText}
+                  value={includeText}
+                  onChangeText={setIncludeText}
                 />
-                <TouchableOpacity style={styles.addButton} onPress={addDay}>
+                <TouchableOpacity style={styles.addButton} onPress={addInclude}>
                   <Text style={styles.addButtonText}>+</Text>
                 </TouchableOpacity>
               </View>
-            }
-            contentContainerStyle={{ paddingBottom: 5 }}
-            keyboardShouldPersistTaps="handled"
-          />
-        </View>
-
-        <View style={styles.screen}>
-          <CategoryDropdown onSelect={(id) => setSelectedTourId(id)} />
-          <SelectCity onSelect={(id) => setSelectedCityId(id)} />
-        </View >
+            </View>
 
 
-        <View style={styles.meetingPoint}>
-          <Text style={styles.titleHeader}>Enter Contact Number : </Text>
-          <TextInput
-            style={styles.underInput}
-            placeholder="Enter Guide Phone number"
-            placeholderTextColor="#666"
-            value={contactInfo.phone}
-            onChangeText={(text) => setContactInfo({ ...contactInfo, phone: text })}
-          />
-        </View>
-        <View style={styles.meetingPoint}>
-          <Text style={styles.titleHeader}>Enter Email Id : </Text>
-          <TextInput
-            style={styles.underInput}
-            placeholder="Enter Email Id"
-            placeholderTextColor="#666"
-            value={contactInfo.email}
-            onChangeText={(text) => setContactInfo({ ...contactInfo, email: text })}
-          />
-        </View>
+            <View style={styles.section}>
+              <Text style={styles.title}>Excludes</Text>
+              <FlatList
+                data={tourExcludes}
+                keyExtractor={(item, index) => index.toString()}
+                renderItem={({ item }) => (
+                  <Text style={styles.bulletPoint}>• {item}</Text>
+                )}
+              />
+              <View style={styles.inputRow}>
+                <TextInput
+                  style={styles.input}
+                  placeholderTextColor="#666"
+                  placeholder="Enter an exclude"
+                  value={excludeText}
+                  onChangeText={setExcludeText}
+                />
+                <TouchableOpacity style={styles.addButton} onPress={addExclude}>
+                  <Text style={styles.addButtonText}>+</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
 
 
 
-        <TouchableOpacity
-          style={styles.submitButton}
-          onPress={handleUpdate}
-        >
-          <Text style={styles.submitButtonText}>
-            {tourId ? 'Update' : 'Register'}
-          </Text>
-        </TouchableOpacity>
+          <View style={styles.leaderContainer}>
 
-      </ScrollView>
+            <View style={styles.leaderDetails}>
+              <Text style={styles.title}>Tour leader:</Text>
+              <TextInput
+                style={styles.textInput}
+                placeholder="Tour Leader Name"
+                placeholderTextColor="#666"
+                value={leaderName}
+                onChangeText={setLeaderName}
+              />
+            </View>
+
+            <TouchableOpacity onPress={pickLeaderImage} style={styles.media}>
+              {leaderImage && leaderImage.uri ? (
+                leaderImage.type?.includes('video') ? (
+
+                  <Video
+                    source={{ uri: leaderImage.uri }}
+                    style={styles.media}
+                    resizeMode="contain"
+                    controls={true}
+                    paused={false}
+                  />
+                ) : (
+
+                  <Image
+                    source={{ uri: leaderImage.uri }}
+                    style={styles.media}
+                  />
+                )
+              ) : (
+
+
+                <>
+                  <Text>Add  a short video or photo of the tour leader</Text>
+                  <Text>Video size upto 50 MB
+                    Image size upto 100 kB </Text>
+                </>
+
+              )}
+            </TouchableOpacity>
+
+
+
+            <TextInput
+              style={styles.textInput}
+              placeholder="Short description about tour leader (Up to 150 words)"
+              placeholderTextColor="#666"
+              multiline
+              value={leaderDescription}
+              onChangeText={handleLeaderDescriptionChange}
+            />
+            <Text style={styles.wordCounter}>
+              {leaderDescriptionWordCount}/150 words
+            </Text>
+          </View>
+
+
+          <Text style={styles.slotHeader}>Day/s on which Tour or walk is conducted</Text>
+
+
+          <View style={{ flex: 1 }}>
+            <FlatList
+              data={days}
+              keyExtractor={(item) => item.id}
+              renderItem={({ item }) => (
+                <View style={styles.dayContainer}>
+                  <View style={styles.dayTimeContainer}>
+                    <View style={styles.dayRow}>
+                      <Text style={styles.dayName}>{item.day}</Text>
+                      <TouchableOpacity onPress={() => deleteDay(item.id)}>
+                        <DeleteIcon name="delete" size={28} style={styles.icon} />
+                      </TouchableOpacity>
+                    </View>
+
+                    <View style={styles.timesRow}>
+                      {item.times.map((time, index) => (
+                        <View key={index} style={styles.timeChip}>
+                          <Text style={styles.timeText}>{time}</Text>
+                          <TouchableOpacity
+                            style={styles.deleteButtonTiny}
+                            onPress={() => deleteTime(item.id, index)}
+                          >
+                            <Text style={styles.deleteButtonText}>-</Text>
+                          </TouchableOpacity>
+                        </View>
+                      ))}
+                    </View>
+                  </View>
+
+                  {activeDayId === item.id ? (
+                    <View style={styles.timeInputContainer}>
+                      <TextInput
+                        style={styles.timeInput}
+                        placeholder="Enter time (e.g., 7 PM)"
+                        value={timeText}
+                        placeholderTextColor="#666"
+                        onChangeText={setTimeText}
+                      />
+                      <TouchableOpacity
+                        style={styles.addButtonSmall}
+                        onPress={() => addTime(item.id)}
+                      >
+                        <Text style={styles.addButtonText}>+</Text>
+                      </TouchableOpacity>
+                    </View>
+                  ) : (
+                    <View style={styles.placeholderContainer}>
+                      <TouchableOpacity
+                        style={styles.addButtonSmall}
+                        onPress={() => setActiveDayId(item.id)}
+                      >
+                        <Text style={styles.addButtonText}>+</Text>
+                      </TouchableOpacity>
+                      <Text style={styles.placeholderText}>Click "+" to add timing</Text>
+                    </View>
+                  )}
+                </View>
+              )}
+              ListFooterComponent={
+                <View style={styles.footer}>
+                  <TextInput
+                    style={styles.input}
+                    placeholder="Add a day (e.g., Monday)"
+                    value={dayText}
+                    placeholderTextColor="#666"
+                    onChangeText={setDayText}
+                  />
+                  <TouchableOpacity style={styles.addButton} onPress={addDay}>
+                    <Text style={styles.addButtonText}>+</Text>
+                  </TouchableOpacity>
+                </View>
+              }
+              contentContainerStyle={{ paddingBottom: 5 }}
+              keyboardShouldPersistTaps="handled"
+            />
+          </View>
+
+          <View style={styles.screen}>
+            <CategoryDropdown onSelect={(id) => setSelectedTourId(id)} />
+            <SelectCity onSelect={(id) => setSelectedCityId(id)} />
+          </View >
+
+
+          <View style={styles.meetingPoint}>
+            <Text style={styles.titleHeader}>Enter Contact Number : </Text>
+            <TextInput
+              style={styles.underInput}
+              placeholder="Enter Guide Phone number"
+              placeholderTextColor="#666"
+              value={contactInfo.phone}
+              onChangeText={(text) => setContactInfo({ ...contactInfo, phone: text })}
+            />
+          </View>
+          <View style={styles.meetingPoint}>
+            <Text style={styles.titleHeader}>Enter Email Id : </Text>
+            <TextInput
+              style={styles.underInput}
+              placeholder="Enter Email Id"
+              placeholderTextColor="#666"
+              value={contactInfo.email}
+              onChangeText={(text) => setContactInfo({ ...contactInfo, email: text })}
+            />
+          </View>
+
+
+
+          <TouchableOpacity
+            style={styles.submitButton}
+            onPress={handleUpdate}
+          >
+            <Text style={styles.submitButtonText}>
+              {tourId ? 'Update' : 'Register'}
+            </Text>
+          </TouchableOpacity>
+
+        </ScrollView>
+
+      </View>
+
+
 
       <Modal
         visible={isLoading}
@@ -947,11 +971,12 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#fff',
+
   },
   scrollContent: {
-    flexGrow: 1,
     paddingHorizontal: width * 0.04,
     paddingTop: height * 0.03,
+    marginBottom: height * 0.08,
   },
   title: {
     fontSize: width * 0.06,
@@ -959,7 +984,7 @@ const styles = StyleSheet.create({
     marginBottom: height * 0.02,
   },
   mediaContainer: {
-    height: "12%",
+    height: height * 0.25,
     marginBottom: height * 0.05,
     alignItems: 'center',
 
@@ -1106,7 +1131,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderRadius: 10,
     marginTop: 20,
-    marginBottom: 100
+
   },
   submitButtonText: {
     color: '#fff',
@@ -1239,14 +1264,14 @@ const styles = StyleSheet.create({
 
   mainTitle: {
     fontSize: 18,
-    flex: width,
     borderBottomWidth: 1,
     borderColor: '#ccc',
     paddingVertical: 5,
+    marginBottom: 16,
     fontWeight: 'bold',
     fontFamily: 'Poppins',
-    marginBottom: 16,
-    textAlign: 'flex-start',
+    textAlign: 'center',
+    color: '#333',
   },
   rowContainer: {
     flexDirection: 'row',
@@ -1423,7 +1448,7 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
   coverPhotoContainer: {
-    height: "10%",
+    height: height * 0.2,
     marginBottom: height * 0.10,
     alignItems: 'center',
   },
@@ -1524,5 +1549,26 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '600',
     color: '#DE3B40',
+  },
+  removeButton: {
+    position: 'absolute',
+    bottom: 15,
+    right: 10,
+    backgroundColor: 'rgba(222, 59, 64, 0.7)',
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    justifyContent: 'center',
+    alignItems: 'center',
+    elevation: 3,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.2,
+    shadowRadius: 1.5,
+  },
+  removeButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: 'bold',
   },
 });

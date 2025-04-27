@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, Dimensions, ScrollView } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, Dimensions, ScrollView, Modal, ActivityIndicator } from 'react-native';
 import Icon from 'react-native-vector-icons/AntDesign';
 import CheckBox from '@react-native-community/checkbox';
 import CustomCheckbox from './CustomCheckBox';
@@ -7,6 +7,9 @@ import { BASE_URL } from "@env";
 import { useNavigation, useRoute } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import RBSheet from 'react-native-raw-bottom-sheet';
+import RNPickerSelect from 'react-native-picker-select';
+import DatePicker from 'react-native-date-picker';
+import { TouchableWithoutFeedback, Keyboard } from 'react-native';
 
 const { width, height } = Dimensions.get('window');
 
@@ -16,6 +19,12 @@ export default function Welcome() {
   const [userType, setUserType] = useState('guide');
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [isSignIn, setIsSignIn] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [gender, setGender] = useState('');
+  const [dob, setDob] = useState(new Date());
+  const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
+  const [instagram, setInstagram] = useState('');
+  const [city, setCity] = useState('');
   const refRBSheet = useRef();
   const navigation = useNavigation();
 
@@ -28,27 +37,30 @@ export default function Welcome() {
   }, []);
 
   const handleSignUp = async () => {
+    setIsLoading(true);
     try {
-      const response = await fetch(`https://latestservice-production.up.railway.app/api/auth/signup`, {
+      const response = await fetch(`http://65.0.167.149:8086/api/auth/signup`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, userType, phone }),
+        body: JSON.stringify({ email, userType, phone, gender, dob, instagram, city }),
       });
-      console.log("these are the values, ", email, userType, phone);
       const result = await response.json();
       if (response.ok) {
-        navigation.navigate('OTP', { email, userType, action: 'signup', phone });
+        navigation.navigate('OTP', { email, userType, action: 'signup', phone, gender, dob, instagram, city });
       } else {
         alert(result.message || 'Signup failed.');
       }
     } catch (error) {
       alert('An error occurred during signup.');
+    } finally {
+      setIsLoading(false);
     }
   };
 
   const handleLogin = async () => {
+    setIsLoading(true);
     try {
-      const response = await fetch(`https://latestservice-production.up.railway.app/api/auth/login-request`, {
+      const response = await fetch(`http://65.0.167.149:8086/api/auth/login-request`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, userType }),
@@ -65,12 +77,12 @@ export default function Welcome() {
       }
     } catch (error) {
       alert('An error occurred during login.');
+    } finally {
+      setIsLoading(false);
     }
   };
 
-  const toggleMenu = () => {
-    refRBSheet.current.open();
-  };
+  const [isGenderModalVisible, setIsGenderModalVisible] = useState(false);
 
   return (
     <View style={styles.container}>
@@ -94,21 +106,128 @@ export default function Welcome() {
           </View>
 
           {!isLoggedIn && (
-            <View style={styles.inputContainer}>
-              <Text style={styles.label}>Mobile Number</Text>
-              <View style={styles.textbox}>
-                <Icon name="mobile1" size={20} color="#DE3B40" style={styles.icon} />
-                <TextInput
-                  style={styles.textInput}
-                  placeholder="Enter Mobile Number"
-                  placeholderTextColor="#DE3B40"
-                  value={phone}
-                  onChangeText={setPhone}
+            <>
+              <View style={styles.inputContainer}>
+                <Text style={styles.label}>Mobile Number</Text>
+                <View style={styles.textbox}>
+                  <Icon name="mobile1" size={20} color="#DE3B40" style={styles.icon} />
+                  <TextInput
+                    style={styles.textInput}
+                    placeholder="Enter Mobile Number"
+                    placeholderTextColor="#DE3B40"
+                    value={phone}
+                    onChangeText={setPhone}
+                  />
+                </View>
+              </View>
+
+              <View style={styles.inputContainer}>
+                <Text style={styles.label}>Gender</Text>
+                <TouchableOpacity
+                  style={[styles.textbox, { justifyContent: 'center' }]}
+                  onPress={() => setIsGenderModalVisible(true)}
+                >
+                  <Text style={[styles.textInput, { textAlignVertical: 'center', paddingVertical: 0 }]}>
+                    {gender || 'Select Gender'}
+                  </Text>
+                </TouchableOpacity>
+
+                <Modal
+                  transparent={true}
+                  animationType="fade"
+                  visible={isGenderModalVisible}
+                  onRequestClose={() => setIsGenderModalVisible(false)}
+                >
+                  <View style={styles.modalContainer}>
+                    <View style={styles.modalContent}>
+                      <TouchableOpacity
+                        style={styles.modalOption}
+                        onPress={() => {
+                          setGender('Male');
+                          setIsGenderModalVisible(false);
+                        }}
+                      >
+                        <Text style={styles.modalOptionText}>Male</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={styles.modalOption}
+                        onPress={() => {
+                          setGender('Female');
+                          setIsGenderModalVisible(false);
+                        }}
+                      >
+                        <Text style={styles.modalOptionText}>Female</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={styles.modalOption}
+                        onPress={() => {
+                          setGender('Prefer not to say');
+                          setIsGenderModalVisible(false);
+                        }}
+                      >
+                        <Text style={styles.modalOptionText}>Prefer not to say</Text>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                </Modal>
+              </View>
+
+              <View style={styles.inputContainer}>
+                <Text style={styles.label}>Date of Birth</Text>
+                <TouchableOpacity
+                  style={[styles.textbox, { justifyContent: 'center' }]}
+                  onPress={() => setIsDatePickerOpen(true)}
+                >
+                  <Text style={[styles.textInput, { textAlignVertical: 'center', paddingVertical: 0 }]}>
+                    {dob
+                      ? `${dob.getDate().toString().padStart(2, '0')}-${(dob.getMonth() + 1)
+                        .toString()
+                        .padStart(2, '0')}-${dob.getFullYear()}`
+                      : 'Select Date of Birth'}
+                  </Text>
+                </TouchableOpacity>
+
+                <DatePicker
+                  modal
+                  open={isDatePickerOpen}
+                  date={dob || new Date()}
+                  mode="date"
+                  onConfirm={(date) => {
+                    setIsDatePickerOpen(false);
+                    setDob(date);
+                  }}
+                  onCancel={() => setIsDatePickerOpen(false)}
                 />
               </View>
-            </View>
-          )}
 
+
+              <View style={styles.inputContainer}>
+                <Text style={styles.label}>Instagram Account (Optional)</Text>
+                <View style={styles.textbox}>
+                  <TextInput
+                    style={styles.textInput}
+                    placeholder="Enter Instagram Link"
+                    placeholderTextColor="#DE3B40"
+                    value={instagram}
+                    onChangeText={setInstagram}
+                  />
+                </View>
+              </View>
+
+              <View style={styles.inputContainer}>
+                <Text style={styles.label}>City of Operation</Text>
+                <View style={styles.textbox}>
+                  <TextInput
+                    style={styles.textInput}
+                    placeholder="Enter City"
+                    placeholderTextColor="#DE3B40"
+                    value={city}
+                    onChangeText={setCity}
+                  />
+                </View>
+              </View>
+            </>
+          )}
           <View style={styles.termsContainer}>
             <CustomCheckbox label="I agree with Terms & Conditions" />
           </View>
@@ -122,7 +241,6 @@ export default function Welcome() {
         </View>
       </ScrollView>
 
-      {/* Footer */}
       <View style={styles.footer}>
         <Text style={styles.footerText}>
           {isLoggedIn ? "Don't have an account?" : 'Already have an account?'}
@@ -132,8 +250,20 @@ export default function Welcome() {
         </TouchableOpacity>
       </View>
 
-      
-    
+      <Modal
+        transparent={true}
+        animationType="fade"
+        visible={isLoading}
+        onRequestClose={() => { }}
+      >
+        <View style={styles.modalContainer}>
+          <View style={styles.modalContent}>
+            <ActivityIndicator size="large" color="#DE3B40" />
+            <Text style={styles.modalTitle}>Sending OTP</Text>
+
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -169,11 +299,10 @@ const styles = StyleSheet.create({
     marginBottom: height * 0.02,
   },
   label: {
-    fontSize: width * 0.05,
-    fontWeight: '700',
+    fontSize: width * 0.04, // Smaller font size
+    fontWeight: '600',
     color: '#171A1F',
-    marginBottom: height * 0.02,
-    marginVertical: height * 0.04,
+    marginBottom: height * 0.01,
   },
   textbox: {
     flexDirection: 'row',
@@ -186,7 +315,7 @@ const styles = StyleSheet.create({
   },
   textInput: {
     flex: 1,
-    fontSize: width * 0.04,
+    fontSize: width * 0.035, // Smaller font size
     color: '#171A1F',
     height: '100%',
   },
@@ -234,32 +363,41 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     marginLeft: width * 0.01,
   },
-  bottomSheet: {
-    width: '100%',
-    paddingVertical: 20,
-    paddingHorizontal: 10,
-    alignItems: 'center', // Centers content
-  },
-  closeButton: {
-    alignSelf: 'flex-end',
-    marginBottom: 10,
-  },
-  bottomSheetItem: {
-    flexDirection: 'row',
+  modalContainer: {
+    flex: 1,
+    justifyContent: 'center',
     alignItems: 'center',
-    justifyContent: 'center', // Centers text
-    paddingVertical: 15,
-    borderBottomWidth: 1,
-    borderBottomColor: '#E0E0E0',
-    width: '100%',
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
   },
-  bottomSheetIcon: {
-    marginRight: 10,
+  modalContent: {
+    width: '80%',
+    padding: 20,
+    backgroundColor: '#FFF',
+    borderRadius: 10,
+    alignItems: 'center',
   },
-  bottomSheetText: {
-    fontSize: 28,
-    color: '#333',
-    textAlign: 'center', // Ensures text alignment
-    flex: 1, // Makes sure text is centered properly
+  modalTitle: {
+    fontSize: width * 0.05,
+    fontWeight: 'bold',
+    color: '#DE3B40',
+    marginTop: 10,
+    textAlign: 'center',
+  },
+  modalOption: {
+    padding: 15,
+    alignItems: 'center',
+  },
+  modalOptionText: {
+    fontSize: width * 0.04,
+    color: '#171A1F',
+  },
+  modalCancel: {
+    marginTop: 10,
+    padding: 15,
+    alignItems: 'center',
+  },
+  modalCancelText: {
+    fontSize: width * 0.04,
+    color: '#DE3B40',
   },
 });

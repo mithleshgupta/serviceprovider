@@ -76,7 +76,7 @@ export default function Registration() {
       }
 
       const response = await fetch(
-        `https://latestservice-production.up.railway.app/api/tours/user/tourTitles`,
+        `http://65.0.167.149:8086/api/tours/user/tourTitles`,
         {
           method: "GET",
           headers: {
@@ -147,7 +147,7 @@ export default function Registration() {
 
     try {
       const response = await fetch(
-        `https://latestservice-production.up.railway.app/api/tours/delete/${selectedTour.tour_id}`,
+        `http://65.0.167.149:8086/api/tours/delete/${selectedTour.tour_id}`,
         {
           method: "DELETE",
           headers: {

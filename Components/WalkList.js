@@ -110,8 +110,8 @@ const styles = StyleSheet.create({
         elevation: 3,
         overflow: 'hidden',
         width: '100%',
-        maxWidth: 350,  // Adjust card width
-        alignSelf: 'center',  // Center the card in the list
+        maxWidth: 350,  
+        alignSelf: 'center',  
     },
     cardContent: {
         padding: 16,
